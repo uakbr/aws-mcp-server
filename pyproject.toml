@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aws-mcp-server"
+version = "1.0.0"
+description = "AWS Model Context Protocol Server"
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Alexei Ledenev" }]
+dependencies = [
+    "fastmcp>=0.4.1",
+    "mcp>=1.0.0"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "moto>=4.0.0",
+]
+lint = [
+    "ruff>=0.2.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "ruff>=0.2.0",
+    "moto>=4.0.0",
+]
+
+[tool.setuptools]
+packages = ["aws_mcp_server"]
+package-dir = { "" = "src" }
+
+[tool.ruff]
+line-length = 160
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = ["aws_mcp_server"]
+
+# Using VSCode + Pylance static typing instead of mypy
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+markers = [
+    "integration: marks tests that require AWS CLI and AWS credentials",
+    "asyncio: mark test as requiring asyncio",
+]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "--cov=aws_mcp_server --cov-report=xml --cov-report=term"
+
+[tool.coverage.run]
+source = ["src/aws_mcp_server"]
+omit = [
+    "*/tests/*",
+    "*/setup.py",
+    "*/conftest.py",
+    "src/aws_mcp_server/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
