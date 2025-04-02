@@ -145,7 +145,16 @@ class APIServer:
         # Log management routes
         self.app.get("/logs")(self.search_logs)
         
-    async def get_current_user(self, token: str = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+        # Use the dependency injector to fix Depends() issues
+        for route in self.app.routes:
+            if hasattr(route, "endpoint") and route.endpoint.__name__ != "login" and route.endpoint.__name__ != "health_check":
+                # Get all parameters from the endpoint
+                parameters = list(route.endpoint.__annotations__.keys())
+                if "user" in parameters:
+                    # Add dependency for user parameter
+                    route.dependencies.append(Depends(self.get_current_user()))
+    
+    async def _get_current_user_impl(self, token: str = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
         """Get the current user from the token."""
         user = await self.auth_manager.validate_token(token)
         if not user:
@@ -155,6 +164,10 @@ class APIServer:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return user
+    
+    def get_current_user(self):
+        """Return the current user function for dependency injection."""
+        return self._get_current_user_impl
     
     async def check_permission(self, user: User, permission: Permission):
         """Check if the user has the required permission."""
@@ -192,13 +205,13 @@ class APIServer:
                 )
             
             return {"access_token": token, "token_type": "bearer"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
-            )
+            ) from err
     
-    async def get_resources(self, request: Request, user: User = Depends(get_current_user)):
+    async def get_resources(self, request: Request, user: User):
         """Get all resources."""
         await self.check_permission(user, Permission.READ_RESOURCES)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -215,7 +228,7 @@ class APIServer:
         resources = await self.resource_registry.get_resources(**query_params)
         return {"resources": resources}
     
-    async def get_resource(self, resource_id: str, user: User = Depends(get_current_user)):
+    async def get_resource(self, resource_id: str, user: User):
         """Get a specific resource by ID."""
         await self.check_permission(user, Permission.READ_RESOURCES)
         
@@ -234,7 +247,7 @@ class APIServer:
         
         return resource
     
-    async def get_configurations(self, request: Request, user: User = Depends(get_current_user)):
+    async def get_configurations(self, request: Request, user: User):
         """Get all configurations."""
         await self.check_permission(user, Permission.READ_CONFIGURATIONS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -251,7 +264,7 @@ class APIServer:
         configs = await self.config_manager.get_configurations(**query_params)
         return {"configurations": configs}
     
-    async def get_configuration(self, config_id: str, user: User = Depends(get_current_user)):
+    async def get_configuration(self, config_id: str, user: User):
         """Get a specific configuration by ID."""
         await self.check_permission(user, Permission.READ_CONFIGURATIONS)
         
@@ -270,7 +283,7 @@ class APIServer:
         
         return config
     
-    async def create_configuration(self, request: Request, user: User = Depends(get_current_user)):
+    async def create_configuration(self, request: Request, user: User):
         """Create a new configuration."""
         await self.check_permission(user, Permission.WRITE_CONFIGURATIONS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -285,18 +298,18 @@ class APIServer:
             config_data = await request.json()
             config_id = await self.config_manager.create_configuration(config_data)
             return {"id": config_id, "status": "created"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
-            )
+            ) from err
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e),
-            )
+            ) from e
     
-    async def update_configuration(self, config_id: str, request: Request, user: User = Depends(get_current_user)):
+    async def update_configuration(self, config_id: str, request: Request, user: User):
         """Update an existing configuration."""
         await self.check_permission(user, Permission.WRITE_CONFIGURATIONS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -318,18 +331,18 @@ class APIServer:
                 )
             
             return {"id": config_id, "status": "updated"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
-            )
+            ) from err
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e),
-            )
+            ) from e
     
-    async def delete_configuration(self, config_id: str, user: User = Depends(get_current_user)):
+    async def delete_configuration(self, config_id: str, user: User):
         """Delete a configuration."""
         await self.check_permission(user, Permission.DELETE_CONFIGURATIONS)
         
@@ -348,7 +361,7 @@ class APIServer:
         
         return {"id": config_id, "status": "deleted"}
     
-    async def get_deployments(self, request: Request, user: User = Depends(get_current_user)):
+    async def get_deployments(self, request: Request, user: User):
         """Get all deployments."""
         await self.check_permission(user, Permission.READ_DEPLOYMENTS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -365,7 +378,7 @@ class APIServer:
         deployments = await self.deployment_manager.get_deployments(**query_params)
         return {"deployments": deployments}
     
-    async def get_deployment(self, deployment_id: str, user: User = Depends(get_current_user)):
+    async def get_deployment(self, deployment_id: str, user: User):
         """Get a specific deployment by ID."""
         await self.check_permission(user, Permission.READ_DEPLOYMENTS)
         
@@ -384,7 +397,7 @@ class APIServer:
         
         return deployment
     
-    async def create_deployment(self, request: Request, user: User = Depends(get_current_user)):
+    async def create_deployment(self, request: Request, user: User):
         """Create a new deployment."""
         await self.check_permission(user, Permission.WRITE_DEPLOYMENTS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -399,18 +412,18 @@ class APIServer:
             deployment_data = await request.json()
             deployment_id = await self.deployment_manager.create_deployment(deployment_data)
             return {"id": deployment_id, "status": "created"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
-            )
+            ) from err
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e),
-            )
+            ) from e
     
-    async def get_metrics(self, request: Request, user: User = Depends(get_current_user)):
+    async def get_metrics(self, request: Request, user: User):
         """Get all metrics."""
         await self.check_permission(user, Permission.READ_METRICS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -427,7 +440,7 @@ class APIServer:
         metrics = await self.metric_registry.get_metrics(**query_params)
         return {"metrics": metrics}
     
-    async def get_metric(self, metric_id: str, user: User = Depends(get_current_user)):
+    async def get_metric(self, metric_id: str, user: User):
         """Get a specific metric by ID."""
         await self.check_permission(user, Permission.READ_METRICS)
         
@@ -446,7 +459,7 @@ class APIServer:
         
         return metric
     
-    async def get_alerts(self, request: Request, user: User = Depends(get_current_user)):
+    async def get_alerts(self, request: Request, user: User):
         """Get all alerts."""
         await self.check_permission(user, Permission.READ_ALERTS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -463,7 +476,7 @@ class APIServer:
         alerts = await self.alert_registry.get_alerts(**query_params)
         return {"alerts": alerts}
     
-    async def get_alert(self, alert_id: str, user: User = Depends(get_current_user)):
+    async def get_alert(self, alert_id: str, user: User):
         """Get a specific alert by ID."""
         await self.check_permission(user, Permission.READ_ALERTS)
         
@@ -482,7 +495,7 @@ class APIServer:
         
         return alert
     
-    async def create_alert(self, request: Request, user: User = Depends(get_current_user)):
+    async def create_alert(self, request: Request, user: User):
         """Create a new alert."""
         await self.check_permission(user, Permission.WRITE_ALERTS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -497,18 +510,18 @@ class APIServer:
             alert_data = await request.json()
             alert_id = await self.alert_registry.create_alert(alert_data)
             return {"id": alert_id, "status": "created"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
-            )
+            ) from err
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e),
-            )
+            ) from e
     
-    async def update_alert(self, alert_id: str, request: Request, user: User = Depends(get_current_user)):
+    async def update_alert(self, alert_id: str, request: Request, user: User):
         """Update an existing alert."""
         await self.check_permission(user, Permission.WRITE_ALERTS)
         await self.rate_limiter.check_rate_limit(request, user)
@@ -530,18 +543,18 @@ class APIServer:
                 )
             
             return {"id": alert_id, "status": "updated"}
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid JSON body",
-            )
+            ) from err
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=str(e),
-            )
+            ) from e
     
-    async def delete_alert(self, alert_id: str, user: User = Depends(get_current_user)):
+    async def delete_alert(self, alert_id: str, user: User):
         """Delete an alert."""
         await self.check_permission(user, Permission.DELETE_ALERTS)
         
@@ -560,7 +573,7 @@ class APIServer:
         
         return {"id": alert_id, "status": "deleted"}
     
-    async def search_logs(self, request: Request, user: User = Depends(get_current_user)):
+    async def search_logs(self, request: Request, user: User):
         """Search logs with filtering."""
         await self.check_permission(user, Permission.READ_LOGS)
         await self.rate_limiter.check_rate_limit(request, user)

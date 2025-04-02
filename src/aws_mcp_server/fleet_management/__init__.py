@@ -5,15 +5,15 @@ This module extends the AWS MCP Server to provide comprehensive
 fleet management capabilities for AWS resources.
 """
 
-from .tools import fleet_management_tools
-from .deployment_tools import deployment_tools
-from .configuration_tools import configuration_tools
-from .execution_tools import execution_tools
-from .monitoring_tools import monitoring_tools
 from .alerts_tools import alerts_tools
-from .logs_tools import logs_tools
 from .api import all_api_tools
+from .configuration_tools import configuration_tools
+from .deployment_tools import deployment_tools
+from .execution_tools import execution_tools
 from .integrations import all_integration_tools
+from .logs_tools import logs_tools
+from .monitoring_tools import monitoring_tools
+from .tools import fleet_management_tools
 
 __version__ = "0.1.0"
 

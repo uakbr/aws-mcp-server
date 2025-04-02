@@ -7,8 +7,8 @@ with the AWS MCP Server's Model Context Protocol.
 
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import datetime
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .alerts import (
@@ -485,11 +485,11 @@ class ProcessMetricDataTool(AlertTool):
         properties={
             "metric_id": {
                 "type": "string",
-                "description": "ID of the metric"
+                "description": "ID of the metric being processed"
             },
             "resource_id": {
                 "type": "string",
-                "description": "Resource ID"
+                "description": "ID of the resource this metric is for"
             },
             "account_id": {
                 "type": "string",
@@ -501,15 +501,15 @@ class ProcessMetricDataTool(AlertTool):
             },
             "timestamp": {
                 "type": "string",
-                "description": "Timestamp (ISO format)"
+                "description": "ISO8601 timestamp for the metric data"
             },
             "value": {
                 "type": "number",
                 "description": "Metric value"
             },
-            "unit": {
-                "type": "string",
-                "description": "Metric unit"
+            "dimensions": {
+                "type": "object",
+                "description": "Optional dimensions for the metric"
             }
         },
         required=["metric_id", "resource_id", "account_id", "region", "value"]
@@ -518,56 +518,51 @@ class ProcessMetricDataTool(AlertTool):
     async def _run(self, params: Dict[str, Any]) -> str:
         """Run the process metric data tool."""
         try:
-            from .monitoring import MetricData, MetricValue
+            from .monitoring import MetricData
             
             metric_id = params.get("metric_id")
             resource_id = params.get("resource_id")
             account_id = params.get("account_id")
             region = params.get("region")
+            timestamp_str = params.get("timestamp")
             value = params.get("value")
-            unit = params.get("unit")
+            dimensions = params.get("dimensions", {})
             
-            # Parse timestamp
-            timestamp = datetime.now()
-            if "timestamp" in params:
-                try:
-                    timestamp = datetime.fromisoformat(params["timestamp"])
-                except ValueError:
-                    return json.dumps({
-                        "error": f"Invalid timestamp format: {params['timestamp']}. Use ISO format."
-                    })
+            # Parse timestamp if provided, otherwise use current time
+            if timestamp_str:
+                timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            else:
+                timestamp = datetime.now()
             
-            # Create metric data
+            # Create metric data object
             metric_data = MetricData(
                 metric_id=metric_id,
                 resource_id=resource_id,
                 account_id=account_id,
-                region=region
+                region=region,
+                timestamp=timestamp,
+                values=[{"timestamp": timestamp, "value": value}],
+                dimensions=dimensions
             )
             
-            metric_data.add_value(value, timestamp, unit)
-            
             # Process the metric data
-            triggered_alerts = await AlertManager.process_metric_data(metric_data)
+            alert_instances = await AlertManager.process_metric_data(metric_data)
             
-            # Format for output
-            result = {
-                "triggered_alerts": [
+            return json.dumps({
+                "processed": True,
+                "metric_id": metric_id,
+                "timestamp": timestamp.isoformat(),
+                "value": value,
+                "alerts_triggered": len(alert_instances),
+                "alert_instances": [
                     {
-                        "instance_id": alert.id,
-                        "alert_id": alert.alert_definition_id,
-                        "resource_id": alert.resource_id,
-                        "severity": alert.severity.value,
-                        "state": alert.state.value,
-                        "metric_value": alert.metric_value,
-                        "triggered_at": alert.last_triggered_at.isoformat()
+                        "id": instance.id,
+                        "state": instance.state.value,
+                        "severity": instance.severity.value
                     }
-                    for alert in triggered_alerts
-                ],
-                "count": len(triggered_alerts)
-            }
-            
-            return json.dumps(result, indent=2)
+                    for instance in alert_instances
+                ]
+            }, indent=2)
             
         except Exception as e:
             logger.error(f"Error processing metric data: {e}", exc_info=True)

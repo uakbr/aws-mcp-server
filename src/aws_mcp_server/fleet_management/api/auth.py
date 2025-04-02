@@ -334,57 +334,52 @@ class AuthManager:
     
     async def validate_token(self, token: str) -> Optional[User]:
         """
-        Validate a JWT token and return the associated user.
+        Validate a JWT token and return the user.
         
         Args:
-            token: The JWT token to validate
+            token: JWT token
             
         Returns:
-            User object if token is valid, None otherwise
+            User if token is valid, None otherwise
         """
-        if token in self._token_blacklist:
-            logger.warning("Token validation failed: Token is blacklisted")
-            return None
-            
         try:
-            payload = jwt.decode(
+            # Validate the token, but we don't need to use the payload here
+            jwt.decode(
                 token,
                 self.config.secret_key,
                 algorithms=[self.config.token_algorithm]
             )
             
-            user_id = payload.get("sub")
-            if not user_id:
-                logger.warning("Token validation failed: No subject claim in token")
-                return None
-                
-            user_data = self.users.get(user_id)
-            if not user_data:
-                logger.warning(f"Token validation failed: User with ID {user_id} not found")
-                return None
-                
-            if user_data.get("disabled", False):
-                logger.warning(f"Token validation failed: User with ID {user_id} is disabled")
-                return None
-                
-            # Construct User object
-            user = User(
-                id=user_id,
-                username=user_data.get("username"),
-                email=user_data.get("email"),
-                full_name=user_data.get("full_name"),
-                disabled=user_data.get("disabled", False),
-                roles=user_data.get("roles", []),
-                created_at=datetime.fromisoformat(user_data.get("created_at")),
-                last_login=datetime.fromisoformat(user_data.get("last_login")) if user_data.get("last_login") else None
+            # Get the username from the payload
+            payload_without_verification = jwt.decode(
+                token,
+                options={"verify_signature": False}
             )
             
-            return user
-        except jwt.ExpiredSignatureError:
-            logger.warning("Token validation failed: Token has expired")
+            username = payload_without_verification.get("sub")
+            if not username:
+                logger.warning("Token has no subject")
+                return None
+            
+            # Get the user for this username
+            for user_id, user_data in self.users.items():
+                if user_data.get("username") == username:
+                    return User(
+                        id=user_id,
+                        username=username,
+                        email=user_data.get("email", ""),
+                        full_name=user_data.get("full_name"),
+                        disabled=user_data.get("disabled", False),
+                        roles=user_data.get("roles", []),
+                        created_at=datetime.fromisoformat(user_data.get("created_at")),
+                        last_login=datetime.fromisoformat(user_data.get("last_login")) if user_data.get("last_login") else None
+                    )
+            
+            logger.warning(f"User {username} not found in database")
             return None
-        except jwt.InvalidTokenError as e:
-            logger.warning(f"Token validation failed: {str(e)}")
+            
+        except jwt.PyJWTError as e:
+            logger.warning(f"Invalid token: {e}")
             return None
     
     async def invalidate_token(self, token: str) -> bool:
@@ -486,7 +481,7 @@ class AuthManager:
             raise ValueError("Username and password are required")
             
         # Check if username already exists
-        for uid, data in self.users.items():
+        for _uid, data in self.users.items():
             if data.get("username") == username:
                 raise ValueError(f"Username {username} already exists")
                 
@@ -539,8 +534,8 @@ class AuthManager:
         if "username" in user_data:
             # Check if new username already exists
             new_username = user_data["username"]
-            for uid, data in self.users.items():
-                if uid != user_id and data.get("username") == new_username:
+            for _uid, data in self.users.items():
+                if _uid != user_id and data.get("username") == new_username:
                     raise ValueError(f"Username {new_username} already exists")
             current_data["username"] = new_username
             
@@ -702,7 +697,7 @@ class AuthManager:
             raise ValueError(f"Cannot delete protected role: {role_name}")
             
         # Check if role is in use
-        for user_id, user_data in self.users.items():
+        for _user_id, user_data in self.users.items():
             if role_name in user_data.get("roles", []):
                 raise ValueError(f"Cannot delete role {role_name} because it is assigned to users")
                 
@@ -744,4 +739,61 @@ class AuthManager:
             with open(self.config.roles_file, "w") as f:
                 json.dump(roles_data, f, indent=2)
         except Exception as e:
-            logger.error(f"Error saving roles to file: {e}") 
+            logger.error(f"Error saving roles to file: {e}")
+    
+    def add_permission_to_role(self, role_name: str, permission_name: str) -> bool:
+        """
+        Add a permission to a role.
+        
+        Args:
+            role_name: Name of the role
+            permission_name: Name of the permission to add
+            
+        Returns:
+            True if permission was added, False otherwise
+        """
+        # Check if role exists
+        role = self.roles.get(role_name)
+        if not role:
+            return False
+        
+        # Parse permission
+        try:
+            perm = Permission[permission_name]
+        except ValueError as err:
+            raise ValueError(f"Invalid permission name: {permission_name}") from err
+            
+        # Add permission if not already in role
+        if perm not in role.permissions:
+            role.permissions.append(perm)
+        return True
+
+    def update_role(self, role_name: str, permissions: List[str]) -> bool:
+        """
+        Update a role's permissions.
+        
+        Args:
+            role_name: Name of the role
+            permissions: List of permission names
+            
+        Returns:
+            True if role was updated, False otherwise
+        """
+        # Check if role exists
+        role = self.roles.get(role_name)
+        if not role:
+            return False
+        
+        # Parse permissions
+        if permissions:
+            permissions_list = []
+            for perm_name in permissions:
+                try:
+                    perm = Permission[perm_name]
+                    permissions_list.append(perm)
+                except ValueError as err:
+                    raise ValueError(f"Invalid permission name: {perm_name}") from err
+            role.permissions = permissions_list
+        
+        self._save_data()
+        return True 

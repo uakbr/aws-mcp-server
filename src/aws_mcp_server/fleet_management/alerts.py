@@ -5,16 +5,14 @@ This module provides capabilities to define and evaluate alerts based on
 metric thresholds, along with routing and delivery mechanisms.
 """
 
-import json
 import logging
-import asyncio
 import uuid
-from datetime import datetime, timedelta
-from enum import Enum
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Union, Set, Callable
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
-from .monitoring import MetricRegistry, MetricManager, MetricData
+from .monitoring import MetricData
 
 logger = logging.getLogger(__name__)
 
@@ -705,7 +703,9 @@ class AlertManager:
                 correlated_alerts = [
                     {
                         "id": corr.id,
-                        "alert_name": AlertRegistry.get_alert(corr.alert_definition_id).name if AlertRegistry.get_alert(corr.alert_definition_id) else "Unknown",
+                        "alert_name": (AlertRegistry.get_alert(corr.alert_definition_id).name 
+                                      if AlertRegistry.get_alert(corr.alert_definition_id) 
+                                      else "Unknown"),
                         "resource_id": corr.resource_id,
                         "triggered_at": corr.last_triggered_at.isoformat()
                     }
@@ -727,7 +727,6 @@ class AlertManager:
         return result
 
 
-# Initialize with some default alerts
 def initialize_alerts(metric_ids: List[str] = None):
     """Initialize the alerting system with default alert definitions."""
     if not metric_ids or len(metric_ids) < 2:
@@ -762,7 +761,9 @@ def initialize_alerts(metric_ids: List[str] = None):
         severity=AlertSeverity.HIGH
     )
     
-    # Create memory alert
+    # Create memory alert if we have enough metrics
+    memory_alert = None
+    composite_alert = None
     if len(metric_ids) > 1:
         memory_condition = AlertManager.create_alert_condition(
             metric_id=metric_ids[1],  # Memory metric
@@ -779,9 +780,8 @@ def initialize_alerts(metric_ids: List[str] = None):
             targets=[email_target, sns_target],
             severity=AlertSeverity.HIGH
         )
-    
-    # Create composite alert (both CPU and memory)
-    if len(metric_ids) > 1:
+        
+        # Create composite alert (both CPU and memory)
         composite_alert = AlertManager.create_alert(
             name="System Resource Saturation",
             description="Both CPU and memory utilization are high",
@@ -790,7 +790,7 @@ def initialize_alerts(metric_ids: List[str] = None):
             severity=AlertSeverity.CRITICAL
         )
     
-    logger.info(f"Initialized alerting system with default alerts: " +
+    logger.info("Initialized alerting system with default alerts: " +
                f"CPU: {cpu_alert.id}" +
                (f", Memory: {memory_alert.id}" if len(metric_ids) > 1 else "") +
                (f", Composite: {composite_alert.id}" if len(metric_ids) > 1 else ""))
