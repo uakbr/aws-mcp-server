@@ -13,6 +13,7 @@ from .monitoring_tools import monitoring_tools
 from .alerts_tools import alerts_tools
 from .logs_tools import logs_tools
 from .api import all_api_tools
+from .integrations import all_integration_tools
 
 __version__ = "0.1.0"
 
@@ -25,5 +26,6 @@ all_tools = (
     monitoring_tools + 
     alerts_tools + 
     logs_tools +
-    all_api_tools
+    all_api_tools +
+    all_integration_tools
 ) 
