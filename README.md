@@ -1,29 +1,29 @@
-
 <div align="center">
-  <img src="https://via.placeholder.com/150x150?text=AWS+MCP" alt="AWS MCP Server Logo" width="150" height="150"/>
+  <img src="./logo.svg" alt="AWS MCP Server Logo" width="200" height="200"/>
   
   # AWS MCP Server
   
   ### Fleet Management and Integration Framework
   
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/aws/aws-mcp-server)
-  [![Code Coverage](https://img.shields.io/badge/coverage-87%25-yellow.svg)](https://codecov.io/gh/aws/aws-mcp-server)
+  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/risklogicgroup/aws-mcp-server)
+  [![Code Coverage](https://img.shields.io/badge/coverage-87%25-yellow.svg)](https://codecov.io/gh/risklogicgroup/aws-mcp-server)
   [![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
   [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-  [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.aws-mcp-server.com)
-</div>
+  [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen.svg)](https://docs.risklogicgroup.com/aws-mcp-server)
 
-<div align="center">
   <p><strong>A comprehensive solution for managing AWS resources at scale with powerful integration capabilities</strong></p>
-  <p><a href="#getting-started">Quick Start</a> • 
-  <a href="#architecture-overview">Architecture</a> • 
-  <a href="#integration-framework">Integration Framework</a> • 
-  <a href="#deployment">Deployment</a> • 
-  <a href="#api-reference">API Reference</a> • 
-  <a href="#contributing">Contributing</a></p>
+  
+  <p>
+    <a href="#getting-started">Quick Start</a> • 
+    <a href="#architecture-overview">Architecture</a> • 
+    <a href="#integration-framework">Integration Framework</a> • 
+    <a href="#deployment">Deployment</a> • 
+    <a href="#api-reference">API Reference</a> • 
+    <a href="#contributing">Contributing</a>
+  </p>
 </div>
 
----
+<hr/>
 
 ## Overview
 
@@ -70,7 +70,7 @@ AWS MCP Server provides organizations with a centralized control plane for manag
 
 ```bash
 # Clone the repository
-git clone https://github.com/aws/aws-mcp-server.git
+git clone https://github.com/risklogicgroup/aws-mcp-server.git
 
 # Change to the project directory
 cd aws-mcp-server
@@ -116,7 +116,7 @@ For more examples, see the [Examples](./examples/) directory.
 ## Architecture Overview
 
 <div align="center">
-  <img src="https://via.placeholder.com/800x400?text=AWS+MCP+Server+Architecture" alt="AWS MCP Server Architecture" width="800"/>
+  <img src="./architecture.svg" alt="AWS MCP Server Architecture" width="800"/>
 </div>
 
 AWS MCP Server employs a modular, layered architecture designed for flexibility, maintainability, and scalability:
@@ -205,8 +205,9 @@ The integration framework is the backbone of AWS MCP Server's connectivity capab
 Integrations follow a well-defined lifecycle that ensures proper initialization, monitoring, and graceful shutdown:
 
 <div align="center">
-  <img src="https://via.placeholder.com/600x300?text=Integration+Lifecycle" alt="Integration Lifecycle" width="600"/>
+  <img src="./lifecycle.svg" alt="Integration Lifecycle" width="800"/>
 </div>
+
 
 ```
 CONFIGURING → TESTING → ACTIVE → ERROR/INACTIVE → DEPRECATED
@@ -417,6 +418,82 @@ AWS MCP Server implements multiple security controls:
 - **Secrets Management**: Integration with AWS Secrets Manager
 - **Audit Logging**: Comprehensive audit trail for compliance
 
+## Roadmap
+
+The following roadmap outlines the planned development and remaining components of the AWS MCP Server project:
+
+<table>
+  <tr>
+    <th>Phase</th>
+    <th>Components</th>
+    <th>Status</th>
+  </tr>
+  <tr>
+    <td><strong>Q1 2025</strong></td>
+    <td>
+      <ul>
+        <li>Specialized Integration Implementations</li>
+        <ul>
+          <li>REST API Integration</li>
+          <li>Webhook Integration</li>
+          <li>GraphQL Integration</li>
+          <li>gRPC Integration</li>
+        </ul>
+        <li>Integration Testing Framework</li>
+        <li>API Endpoint Documentation</li>
+      </ul>
+    </td>
+    <td>In Progress</td>
+  </tr>
+  <tr>
+    <td><strong>Q2 2025</strong></td>
+    <td>
+      <ul>
+        <li>Web Console UI</li>
+        <ul>
+          <li>Integration Dashboard</li>
+          <li>Configuration Wizard</li>
+          <li>Health Monitoring</li>
+        </ul>
+        <li>Message Queue Integration</li>
+        <li>Event Bus Integration</li>
+        <li>Comprehensive Authentication Providers</li>
+      </ul>
+    </td>
+    <td>Planned</td>
+  </tr>
+  <tr>
+    <td><strong>Q3 2025</strong></td>
+    <td>
+      <ul>
+        <li>Advanced Deployment Options</li>
+        <li>Enhanced Security Features</li>
+        <ul>
+          <li>Role-Based Access Control</li>
+          <li>Audit Logging</li>
+          <li>Compliance Reporting</li>
+        </ul>
+        <li>Integration Marketplace</li>
+        <li>Performance Optimization</li>
+      </ul>
+    </td>
+    <td>Planned</td>
+  </tr>
+  <tr>
+    <td><strong>Q4 2025</strong></td>
+    <td>
+      <ul>
+        <li>AI-Powered Recommendations</li>
+        <li>Cross-Account Orchestration</li>
+        <li>Custom Workflow Builder</li>
+        <li>Enterprise-Grade Scaling</li>
+        <li>High Availability Configuration</li>
+      </ul>
+    </td>
+    <td>Planned</td>
+  </tr>
+</table>
+
 ## Troubleshooting
 
 ### Common Issues
@@ -466,45 +543,6 @@ class StructuredLogFormatter(logging.Formatter):
         return json.dumps(log_record)
 ```
 
-## Roadmap
-
-<table>
-  <tr>
-    <th>Timeline</th>
-    <th>Features</th>
-  </tr>
-  <tr>
-    <td>Q4 2023</td>
-    <td>
-      <ul>
-        <li>Enhanced AWS Organizations integration</li>
-        <li>Multi-region resource synchronization</li>
-        <li>Advanced retry policies</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td>Q1 2024</td>
-    <td>
-      <ul>
-        <li>AI-powered resource optimization</li>
-        <li>Integration marketplace</li>
-        <li>Custom workflow builder</li>
-      </ul>
-    </td>
-  </tr>
-  <tr>
-    <td>Q2 2024</td>
-    <td>
-      <ul>
-        <li>Advanced compliance reporting</li>
-        <li>Cross-account orchestration</li>
-        <li>Enhanced security controls</li>
-      </ul>
-    </td>
-  </tr>
-</table>
-
 ## Contributing
 
 We welcome contributions from the community! See [CONTRIBUTING.md](./CONTRIBUTING.md) for details on how to get started.
@@ -517,10 +555,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
   <p>
-    <a href="https://aws.amazon.com">AWS</a> •
-    <a href="https://github.com/aws/aws-mcp-server">GitHub</a> •
-    <a href="https://docs.aws-mcp-server.com">Documentation</a> •
-    <a href="https://aws-mcp-server.com/community">Community</a>
+    <a href="https://risklogicgroup.com">Risk Logic Group</a> •
+    <a href="https://github.com/risklogicgroup/aws-mcp-server">GitHub</a> •
+    <a href="https://docs.risklogicgroup.com/aws-mcp-server">Documentation</a> •
+    <a href="https://risklogicgroup.com/community">Community</a>
   </p>
-  <p><small>Copyright © 2023 AWS MCP Server Team. All rights reserved.</small></p>
+  <p><small>Copyright © 2025 <a href="https://risklogicgroup.com">Risk Logic Group LLC</a>. All rights reserved.</small></p>
 </div>

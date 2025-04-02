@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="200" viewBox="0 0 800 200">
+  <!-- Background -->
+  <rect width="800" height="200" fill="#1e2a3a" />
+  
+  <!-- Boxes -->
+  <rect x="50" y="75" width="120" height="50" rx="5" ry="5" fill="#3366cc" />
+  <rect x="210" y="75" width="120" height="50" rx="5" ry="5" fill="#8866cc" />
+  <rect x="370" y="75" width="120" height="50" rx="5" ry="5" fill="#33aa66" />
+  <rect x="530" y="75" width="120" height="50" rx="5" ry="5" fill="#cc6633" />
+  <rect x="690" y="75" width="60" height="50" rx="5" ry="5" fill="#888888" />
+  
+  <!-- Arrows -->
+  <path d="M170 100 L200 100 L200 100 L210 100" stroke="#ffffff" stroke-width="2" />
+  <path d="M202 95 L210 100 L202 105" fill="#ffffff" />
+  
+  <path d="M330 100 L360 100 L360 100 L370 100" stroke="#ffffff" stroke-width="2" />
+  <path d="M362 95 L370 100 L362 105" fill="#ffffff" />
+  
+  <path d="M490 100 L520 100 L520 100 L530 100" stroke="#ffffff" stroke-width="2" />
+  <path d="M522 95 L530 100 L522 105" fill="#ffffff" />
+  
+  <path d="M650 100 L680 100 L680 100 L690 100" stroke="#ffffff" stroke-width="2" />
+  <path d="M682 95 L690 100 L682 105" fill="#ffffff" />
+  
+  <!-- Recovery path -->
+  <path d="M590 125 C590 145 430 145 430 125" stroke="#ffffff" stroke-width="2" stroke-dasharray="5,3" fill="none" />
+  <path d="M432 133 L430 125 L438 127" fill="#ffffff" />
+  
+  <!-- Text -->
+  <text x="110" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#ffffff">CONFIGURING</text>
+  <text x="270" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#ffffff">TESTING</text>
+  <text x="430" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#ffffff">ACTIVE</text>
+  <text x="590" y="105" font-family="Arial, sans-serif" font-size="12" text-anchor="middle" fill="#ffffff">ERROR/INACTIVE</text>
+  <text x="720" y="105" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#ffffff">DEPRECATED</text>
+  <text x="510" y="160" font-family="Arial, sans-serif" font-size="10" text-anchor="middle" fill="#cccccc">Recovery</text>
+</svg>

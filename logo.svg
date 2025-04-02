@@ -1,0 +1,47 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle with subtle gradient -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#232f3e" />
+      <stop offset="100%" stop-color="#1a2433" />
+    </linearGradient>
+    <linearGradient id="node-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff9900" />
+      <stop offset="100%" stop-color="#ff7700" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main circle -->
+  <circle cx="100" cy="100" r="90" fill="url(#bg-gradient)" />
+  <circle cx="100" cy="100" r="85" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.2" />
+  
+  <!-- Integration network visualization -->
+  <!-- Main nodes -->
+  <circle cx="100" cy="75" r="12" fill="url(#node-gradient)" />
+  <circle cx="65" cy="115" r="12" fill="url(#node-gradient)" />
+  <circle cx="135" cy="115" r="12" fill="url(#node-gradient)" />
+  
+  <!-- Secondary nodes -->
+  <circle cx="82" cy="60" r="5" fill="#ffffff" opacity="0.7" />
+  <circle cx="118" cy="60" r="5" fill="#ffffff" opacity="0.7" />
+  <circle cx="50" cy="90" r="5" fill="#ffffff" opacity="0.7" />
+  <circle cx="150" cy="90" r="5" fill="#ffffff" opacity="0.7" />
+  <circle cx="82" cy="140" r="5" fill="#ffffff" opacity="0.7" />
+  <circle cx="118" cy="140" r="5" fill="#ffffff" opacity="0.7" />
+  
+  <!-- Connection lines -->
+  <line x1="100" y1="75" x2="65" y2="115" stroke="#ffffff" stroke-width="2.5" />
+  <line x1="100" y1="75" x2="135" y2="115" stroke="#ffffff" stroke-width="2.5" />
+  <line x1="65" y1="115" x2="135" y2="115" stroke="#ffffff" stroke-width="2.5" />
+  
+  <!-- Secondary connections -->
+  <line x1="82" y1="60" x2="100" y2="75" stroke="#ffffff" stroke-width="1.5" opacity="0.6" />
+  <line x1="118" y1="60" x2="100" y2="75" stroke="#ffffff" stroke-width="1.5" opacity="0.6" />
+  <line x1="50" y1="90" x2="65" y2="115" stroke="#ffffff" stroke-width="1.5" opacity="0.6" />
+  <line x1="150" y1="90" x2="135" y2="115" stroke="#ffffff" stroke-width="1.5" opacity="0.6" />
+  <line x1="82" y1="140" x2="65" y2="115" stroke="#ffffff" stroke-width="1.5" opacity="0.6" />
+  <line x1="118" y1="140" x2="135" y2="115" stroke="#ffffff" stroke-width="1.5" opacity="0.6" />
+  
+  <!-- MCP text -->
+  <text x="100" y="165" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="bold" text-anchor="middle" fill="#ffffff">MCP</text>
+</svg>
