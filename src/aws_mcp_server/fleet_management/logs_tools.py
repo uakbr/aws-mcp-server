@@ -1,19 +1,18 @@
 """
-Log Management Tools for AWS MCP Server.
+Log Tools for AWS Fleet Management.
 
-This module provides tools for integrating log management capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for interacting with the log management system.
 """
 
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .logs import (
-    LogManager, LogPatternRegistry, LogGroupRegistry,
-    LogSource, LogStatus, LogSeverity
+    LogGroupRegistry, LogManager, LogPatternRegistry,
+    LogSeverity, LogSource, LogStatus
 )
 
 logger = logging.getLogger(__name__)

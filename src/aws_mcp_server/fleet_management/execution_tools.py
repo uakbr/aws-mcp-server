@@ -1,20 +1,19 @@
 """
-Configuration Execution Tools for AWS MCP Server.
+Execution Tools for AWS Fleet Management.
 
-This module provides tools for integrating the configuration execution engine
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for executing configuration changes.
 """
 
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
-from .configuration import ConfigManager, ConfigRegistry, ConfigType
+from .configuration import ConfigRegistry
 from .configuration_executor import (
-    ExecutionEngine, ExecutionScheduler, ConfigCommandRegistry,
-    ConfigExecutionRegistry, ExecutionStatus
+    ConfigCommandRegistry, ConfigExecutionRegistry,
+    ExecutionEngine, ExecutionScheduler, ExecutionStatus
 )
 
 logger = logging.getLogger(__name__)

@@ -1,21 +1,19 @@
 """
-Webhook Tools for AWS MCP Server.
+Webhook Tools for AWS Fleet Management.
 
-This module provides tools for integrating webhook capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for managing webhook integrations.
 """
 
-import json
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List
 
 from ..tools import Tool, ToolSchema
-from .integration import IntegrationConfig, IntegrationType, Direction, AuthType, AuthConfig
-from .webhooks import (
-    WebhookRegistry, Webhook, WebhookConfig, WebhookMethod, WebhookContentType,
-    SignatureMethod, WebhookSignatureConfig, WebhookHandler
-)
+from .integration import Direction, IntegrationConfig, IntegrationType
 from .integration_tools import integration_registry
+from .webhooks import (
+    SignatureMethod, Webhook, WebhookConfig, WebhookContentType,
+    WebhookMethod, WebhookRegistry, WebhookSignatureConfig
+)
 
 logger = logging.getLogger(__name__)
 

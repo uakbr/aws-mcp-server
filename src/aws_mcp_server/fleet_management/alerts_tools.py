@@ -1,10 +1,10 @@
 """
 Alert Tools for AWS MCP Server.
 
-This module provides tools for integrating alerting capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for managing alerts and alert definitions.
 """
 
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict

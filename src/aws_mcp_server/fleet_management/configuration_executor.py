@@ -1,21 +1,18 @@
 """
-Configuration Execution Engine for AWS Fleet Management.
+Configuration Executor for AWS Fleet Management.
 
-This module provides capabilities to execute configuration changes
-across AWS resources in parallel with error handling and result aggregation.
+This module provides execution capabilities for configurations.
 """
 
 import asyncio
-import json
 import logging
-import time
 import uuid
-from datetime import datetime, timedelta
-from enum import Enum
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Callable, Union, Set, Tuple
+from datetime import datetime
+from enum import Enum
+from typing import Any, Callable, Dict, List, Optional
 
-from .configuration import ConfigManager, ConfigRegistry, ConfigType
+from .configuration import ConfigRegistry
 
 logger = logging.getLogger(__name__)
 

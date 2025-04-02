@@ -5,14 +5,12 @@ This module provides capabilities to collect, aggregate, and analyze
 metrics across the fleet of AWS resources.
 """
 
-import json
 import logging
-import asyncio
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Union, Set
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,7 @@
 """
-Webhook Integration System for AWS Fleet Management.
+Webhook Integration for AWS Fleet Management.
 
-This module provides capabilities for integrating with external systems
-via webhooks, including both outbound notifications and inbound webhooks.
+This module provides webhook integration capabilities.
 """
 
 import hashlib
@@ -16,8 +15,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from .integration import AuthConfig, Integration, IntegrationConfig
-from .integration import IntegrationStatus, IntegrationType
+from .integration import Integration, IntegrationConfig, IntegrationStatus, IntegrationType
 
 logger = logging.getLogger(__name__)
 

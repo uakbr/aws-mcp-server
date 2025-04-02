@@ -1,17 +1,14 @@
 """
-Integration Tools for AWS MCP Server.
+Integration Tools for AWS Fleet Management.
 
-This module provides tools for managing integrations with external systems.
+This module provides tools for managing external integrations.
 """
 
-import json
 import logging
-import asyncio
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List
 
 from ..tools import Tool, ToolSchema
-from .integration import IntegrationRegistry, Integration, IntegrationConfig
-from .integration import IntegrationType, Direction, AuthType, AuthConfig
+from .integration import AuthConfig, AuthType, Direction, IntegrationConfig, IntegrationRegistry, IntegrationType
 
 logger = logging.getLogger(__name__)
 

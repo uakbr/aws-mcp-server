@@ -1,13 +1,12 @@
 """
-Resource Discovery Framework for AWS Fleet Management.
+Resource Discovery for AWS Fleet Management.
 
-This module provides capabilities to discover and inventory AWS resources
-across accounts and regions for comprehensive fleet management.
+This module provides discovery capabilities for AWS resources.
 """
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Set, Tuple, Any
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

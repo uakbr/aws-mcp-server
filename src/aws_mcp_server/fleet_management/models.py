@@ -130,19 +130,22 @@ class EC2Instance(BaseResource):
     root_volume_id: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert EC2 instance to dictionary representation."""
-        result = super().to_dict()
+        """
+        Convert the EC2 instance to a dictionary.
         
-        # Add EC2-specific fields
+        Returns:
+            Dictionary representation of the instance
+        """
         ec2_fields = [
-            'instance_type', 'private_ip', 'public_ip', 'vpc_id', 
-            'subnet_id', 'iam_role', 'availability_zone', 'root_volume_id'
+            "id", "name", "instance_type", "state", "public_ip",
+            "private_ip", "vpc_id", "subnet_id", "security_groups",
+            "ami_id", "launch_time", "availability_zone", "tags"
         ]
         
-        for field in ec2_fields:
-            value = getattr(self, field)
+        for field_key in ec2_fields:
+            value = getattr(self, field_key)
             if value:
-                result[field] = value
+                result[field_key] = value
                 
         if self.security_groups:
             result['security_groups'] = self.security_groups

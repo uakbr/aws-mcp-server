@@ -1,18 +1,18 @@
 """
-Monitoring Tools for AWS MCP Server.
+Monitoring Tools for AWS Fleet Management.
 
-This module provides tools for integrating monitoring capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for interacting with the monitoring system.
 """
 
 import json
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import datetime
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .monitoring import (
-    MetricManager, MetricRegistry, MetricType, MetricPriority, MetricStatus
+    MetricManager, MetricPriority, MetricRegistry,
+    MetricStatus, MetricType
 )
 
 logger = logging.getLogger(__name__)

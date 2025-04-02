@@ -1,8 +1,7 @@
 """
-API Server Implementation for AWS Fleet Management.
+API Server for AWS Fleet Management.
 
-This module implements a RESTful API server using FastAPI to expose
-fleet management capabilities over HTTP.
+This module provides a RESTful API for interacting with the AWS Fleet Management system.
 """
 
 import asyncio

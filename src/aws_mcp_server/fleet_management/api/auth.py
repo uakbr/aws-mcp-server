@@ -1,21 +1,19 @@
 """
-Authentication Manager for API Layer.
+Authentication System for AWS Fleet Management.
 
-This module handles user authentication, token management, and
-permission checking for the API layer.
+This module provides user authentication and authorization for the AWS Fleet Management system.
 """
 
-import os
-import json
-import logging
-import asyncio
 import hashlib
+import json
+import jwt
+import logging
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Set
 from pathlib import Path
-import jwt
+from typing import Any, Dict, List, Optional, Set
 
 logger = logging.getLogger(__name__)
 
@@ -331,55 +329,26 @@ class AuthManager:
         
         return token
     
-    async def validate_token(self, token: str) -> Optional[User]:
+    def validate_token(self, token: str) -> bool:
         """
-        Validate a JWT token and return the user.
+        Validate an authentication token.
         
         Args:
-            token: JWT token
+            token: The token to validate
             
         Returns:
-            User if token is valid, None otherwise
+            True if token is valid, False otherwise
         """
         try:
-            # Validate the token
+            # Only verify the token, don't need to use the payload
             jwt.decode(
                 token,
                 self.config.secret_key,
                 algorithms=[self.config.token_algorithm]
             )
-            
-            # Get the username from the payload
-            payload_without_verification = jwt.decode(
-                token,
-                options={"verify_signature": False}
-            )
-            
-            username = payload_without_verification.get("sub")
-            if not username:
-                logger.warning("Token has no subject")
-                return None
-            
-            # Get the user for this username
-            for user_id, user_data in self.users.items():
-                if user_data.get("username") == username:
-                    return User(
-                        id=user_id,
-                        username=username,
-                        email=user_data.get("email", ""),
-                        full_name=user_data.get("full_name"),
-                        disabled=user_data.get("disabled", False),
-                        roles=user_data.get("roles", []),
-                        created_at=datetime.fromisoformat(user_data.get("created_at")),
-                        last_login=datetime.fromisoformat(user_data.get("last_login")) if user_data.get("last_login") else None
-                    )
-            
-            logger.warning(f"User {username} not found in database")
-            return None
-            
-        except jwt.PyJWTError as e:
-            logger.warning(f"Invalid token: {e}")
-            return None
+            return True
+        except jwt.PyJWTError:
+            return False
     
     async def invalidate_token(self, token: str) -> bool:
         """

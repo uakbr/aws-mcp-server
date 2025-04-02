@@ -1,14 +1,12 @@
 """
-Fleet Management Tools for AWS MCP Server.
+Fleet Management Tools for AWS.
 
-This module provides tools for integrating fleet management capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for discovering and managing AWS resources.
 """
 
 import json
-import asyncio
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .discovery import discover_all_resources

@@ -762,14 +762,15 @@ def initialize_logs():
     # Create log patterns
     
     # Define commonly used log patterns
-    patterns = [
+    # Note: This is a sample only - not used in the code
+    _ = [
         LogPattern(
             id=f"pattern-{uuid.uuid4()}",
             name="Access Log Pattern",
             description="Pattern for HTTP access logs",
             pattern=(
                 r'(?P<client_ip>\S+) - (?P<remote_user>\S+) '
-                r'\[(?P<timestamp>[^\]]+)\] '
+                r'\[(?P<timestamp>[^]]+)\] '
                 r'"(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" '
                 r'(?P<status>\d+) (?P<bytes>\d+)'
             )
@@ -851,4 +852,27 @@ def initialize_logs():
     return {
         "patterns": [access_log_pattern.id, log_level_pattern.id, json_log_pattern.id],
         "groups": [ec2_syslog.id, ec2_app_log.id, lambda_log.id, rds_log.id]
-    } 
+    }
+
+
+def matches_text(self, entry: 'LogEntry', query_string: str) -> bool:
+    """
+    Check if the log entry matches the given text.
+    
+    Args:
+        entry: Log entry to check
+        query_string: Text to search for
+        
+    Returns:
+        True if entry matches query
+    """
+    # Check raw message
+    if query_string.lower() in entry.message.lower():
+        return True
+    
+    # Check parsed fields
+    for _field_name, value in entry.parsed_data.items():
+        if isinstance(value, str) and query_string.lower() in value.lower():
+            return True
+    
+    return False 

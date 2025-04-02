@@ -1,20 +1,17 @@
 """
-Configuration Management System for AWS Fleet Management.
+Configuration System for AWS Fleet Management.
 
-This module provides capabilities to manage configurations across
-the fleet of AWS resources in a hierarchical, inheritable, and secure manner.
+This module provides configuration management for the AWS Fleet Management system.
 """
 
-import json
+import base64
 import logging
-import asyncio
-import copy
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional, Union, Set
-import base64
+from typing import Any, Dict, List, Optional
+
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC

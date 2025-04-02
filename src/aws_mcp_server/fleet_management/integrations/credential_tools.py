@@ -1,18 +1,17 @@
 """
-Credential Tools for AWS MCP Server.
+Credential Tools for AWS Fleet Management.
 
-This module provides tools for managing secure credentials for external system integrations.
+This module provides tools for managing credentials for external integrations.
 """
 
-import json
 import logging
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
+from typing import Any, Dict, List
 
 from ..tools import Tool, ToolSchema
 from .credentials import (
-    CredentialManager, Credential, CredentialConfig, CredentialType,
-    CredentialStorageType, CredentialFormat
+    CredentialConfig, CredentialFormat, CredentialManager,
+    CredentialStorageType, CredentialType
 )
 
 logger = logging.getLogger(__name__)

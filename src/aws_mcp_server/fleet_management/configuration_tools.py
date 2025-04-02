@@ -1,16 +1,15 @@
 """
-Configuration Management Tools for AWS MCP Server.
+Configuration Tools for AWS Fleet Management.
 
-This module provides tools for integrating configuration management capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for interacting with the configuration system.
 """
 
 import json
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
-from .configuration import ConfigManager, ConfigRegistry, ConfigType, ConfigStatus
+from .configuration import ConfigManager, ConfigRegistry, ConfigStatus, ConfigType
 
 logger = logging.getLogger(__name__)
 

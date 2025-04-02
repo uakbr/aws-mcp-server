@@ -1,19 +1,17 @@
 """
-Deployment Automation Tools for AWS MCP Server.
+Deployment Tools for AWS Fleet Management.
 
-This module provides tools for integrating deployment automation capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for interacting with the deployment system.
 """
 
 import json
 import logging
-import uuid
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .deployment import (
-    DeploymentManager, TemplateRegistry, DeploymentTemplate, 
-    TemplateParameter, DeploymentStatus
+    DeploymentManager, DeploymentTemplate, 
+    TemplateParameter, TemplateRegistry
 )
 
 logger = logging.getLogger(__name__)

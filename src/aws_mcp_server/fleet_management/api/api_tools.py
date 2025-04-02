@@ -1,8 +1,7 @@
 """
-API Tools for AWS MCP Server.
+API Tools for AWS Fleet Management.
 
-This module provides tools for integrating the API capabilities
-with the AWS MCP Server's Model Context Protocol.
+This module provides tools for interacting with the API server.
 """
 
 import asyncio
@@ -604,18 +603,11 @@ class GenerateClientLibraryTool(Tool):
         This function creates client libraries in specified languages
         to interact with the Fleet Management API.
         """
-        language = parameters.get("language", "javascript")
-        output_dir = parameters.get("output_dir", "./client")
-        version = parameters.get("version", "0.1.0")
-        package_name = parameters.get("package_name", "fleet-management-client")
-        
-        # Get OpenAPI spec from server
-        # We don't need to use server instance here
+        output_dir = parameters.get("output_dir", "./client_library")
+        language = parameters.get("language", "python")
         
         # For now, we'll simulate generating a client library 
         # by creating a few template files
-        import os
-        
         os.makedirs(output_dir, exist_ok=True)
         
         files = []
@@ -624,8 +616,8 @@ class GenerateClientLibraryTool(Tool):
             # Create JavaScript client files
             with open(f"{output_dir}/package.json", "w") as f:
                 f.write(f'''{{
-  "name": "{package_name}",
-  "version": "{version}",
+  "name": "{parameters.get("package_name", "fleet-management-client")}",
+  "version": "{parameters.get("version", "0.1.0")}",
   "description": "Client library for AWS Fleet Management API",
   "main": "index.js",
   "scripts": {{

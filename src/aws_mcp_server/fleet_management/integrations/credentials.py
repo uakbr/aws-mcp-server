@@ -1,22 +1,20 @@
 """
-External Credential Management for AWS Fleet Management.
+Credential Management for AWS Fleet Management.
 
-This module provides secure storage and management of credentials
-for external system integrations.
+This module provides secure credential management for integrations.
 """
 
-import os
-import json
 import base64
-import logging
-import hashlib
-import secrets
 import boto3
-from enum import Enum
-from typing import Dict, List, Any, Optional, Union, Set
+import json
+import logging
+import os
+import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes

@@ -1,15 +1,16 @@
 """
-Rate Limiter for API Layer.
+Rate Limiter for API Server.
 
-This module provides rate limiting capabilities for the API server
-to protect against abuse and ensure fair resource usage.
+This module provides rate limiting capabilities for the API layer.
 """
 
 import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from enum import Enum
 from typing import Dict, List, Optional, Tuple
+
 from fastapi import HTTPException, Request, status
 
 from .auth import User
@@ -419,8 +420,7 @@ class RateLimiter:
                     if new_count >= requests_per_minute:
                         raise HTTPException(
                             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                            detail=f"Rate limit exceeded. Try again in {self.config.max_delay} seconds.",
-                            headers={"Retry-After": str(self.config.max_delay)}
+                            detail=f"Rate limit exceeded for endpoint: {endpoint}"
                         )
             
             # Check IP rate limits as well

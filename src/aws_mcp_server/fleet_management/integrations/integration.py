@@ -1,22 +1,17 @@
 """
-Integration Framework for AWS Fleet Management.
+Integration System for AWS Fleet Management.
 
-This module provides the core framework for integrating with external
-third-party systems, including registration, configuration, and execution.
+This module provides base infrastructure for external system integrations.
 """
 
+import asyncio
 import json
 import logging
-import asyncio
-import importlib
-import inspect
-from enum import Enum
-from typing import Dict, List, Any, Optional, Union, Callable, Type
 from dataclasses import dataclass, field
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
-
-from ..models import ResourceRegistry
+from typing import Any, Dict, List, Optional, Type
 
 logger = logging.getLogger(__name__)
 

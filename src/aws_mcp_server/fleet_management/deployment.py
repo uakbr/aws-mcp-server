@@ -1,18 +1,15 @@
 """
-Deployment Automation Framework for AWS Fleet Management.
+Deployment System for AWS Fleet Management.
 
-This module provides capabilities to automate the deployment
-of AWS resources in a standardized, repeatable way.
+This module provides deployment capabilities for AWS resources.
 """
 
 import asyncio
-import json
 import logging
-import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Dict, List, Optional, Any, Union, Callable
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
