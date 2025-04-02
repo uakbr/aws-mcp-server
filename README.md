@@ -1,318 +1,616 @@
-# AWS Model Context Protocol (MCP) Server
 
-A lightweight service that enables AI assistants to execute AWS CLI commands through the Model Context Protocol (MCP).
+# AWS MCP Server
 
-## Overview
+## Fleet Management and Integration Framework
 
-The AWS MCP Server provides a bridge between MCP-aware AI assistants (like Claude Desktop, Cursor, Windsurf) and the AWS CLI. It enables these assistants to:
+---
 
-1. **Retrieve AWS CLI documentation** - Get detailed help on AWS services and commands
-2. **Execute AWS CLI commands** - Run commands and receive formatted results optimized for AI consumption
+## Table of Contents
 
-```mermaid
-flowchart LR
-    AI[AI Assistant] <-->|MCP Protocol| Server[AWS MCP Server]
-    Server <-->|Subprocess| AWS[AWS CLI]
-    AWS <-->|API| Cloud[AWS Cloud]
+1. [Introduction](#introduction)
+2. [Architecture Overview](#architecture-overview)
+3. [Core Components](#core-components)
+4. [Integration Framework](#integration-framework)
+   - [Integration Types](#integration-types)
+   - [Configuration](#integration-configuration)
+   - [Authentication](#authentication)
+   - [Health Checks](#health-checks)
+   - [Retry Mechanisms](#retry-mechanisms)
+5. [API Layer](#api-layer)
+6. [Getting Started](#getting-started)
+7. [Development Guide](#development-guide)
+8. [Deployment](#deployment)
+9. [Advanced Topics](#advanced-topics)
+10. [Troubleshooting](#troubleshooting)
+
+---
+
+## Introduction
+
+AWS MCP Server is a comprehensive fleet management solution for AWS resources. It provides a centralized platform for managing resources across multiple AWS accounts, regions, and services. The server includes an extensive integration framework that allows for seamless connectivity with external systems, APIs, and data sources.
+
+The platform is designed with a focus on:
+- **Scalability**: Support for thousands of AWS resources across multiple accounts
+- **Extensibility**: Pluggable integration framework
+- **Resilience**: Fault-tolerant architecture with health checks and retry mechanisms
+- **Security**: Comprehensive authentication and authorization
+- **Observability**: Built-in monitoring and logging
+
+---
+
+## Architecture Overview
+
+The AWS MCP Server follows a layered architecture pattern:
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                         Presentation Layer                     │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐  │
+│  │ Web Console │   │    CLI      │   │  Programmatic API   │  │
+│  └─────────────┘   └─────────────┘   └─────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                             │
+┌───────────────────────────┼───────────────────────────────────┐
+│                       API Layer                                │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐  │
+│  │  REST API   │   │ GraphQL API │   │    WebSockets       │  │
+│  └─────────────┘   └─────────────┘   └─────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                             │
+┌───────────────────────────┼───────────────────────────────────┐
+│                     Service Layer                              │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐  │
+│  │Resource Mgmt│   │Fleet Control│   │Integration Services │  │
+│  └─────────────┘   └─────────────┘   └─────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                             │
+┌───────────────────────────┼───────────────────────────────────┐
+│                    Integration Layer                           │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────────────┐  │
+│  │ AWS Services│   │External APIs│   │  Data Sources       │  │
+│  └─────────────┘   └─────────────┘   └─────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-The video demonstrates using Claude Desktop with AWS MCP Server to create a new AWS EC2 instance with AWS SSM agent installed.
+### Key Architecture Principles
 
-## Features
+1. **Asynchronous Design**: The server uses Python's asyncio for non-blocking operations
+2. **Domain-Driven Design**: Components are organized around business domains
+3. **Configuration-Driven**: Behavior is controlled through structured configuration
+4. **Stateless Services**: Where possible, services are designed to be stateless
+5. **Event-Driven Communication**: Services communicate through events when appropriate
 
-- **Command Documentation** - Detailed help information for AWS CLI commands
-- **Command Execution** - Execute AWS CLI commands and return human-readable results
-- **Unix Pipe Support** - Filter and transform AWS CLI output using standard Unix pipes and utilities
-- **Prompt Templates** - Pre-defined prompt templates for common AWS tasks following best practices
-- **Docker Integration** - Simple deployment through containerization with multi-architecture support (AMD64/x86_64 and ARM64)
-- **AWS Authentication** - Leverages existing AWS credentials on the host machine
+---
 
-## Requirements
+## Core Components
 
-- Docker (default) or Python 3.13+ (and AWS CLI installed locally)
-- AWS credentials configured
+### CLI Executor (`src/aws_mcp_server/cli_executor.py`)
+Provides a unified interface for executing AWS CLI commands across accounts and regions.
+
+### Resource Registry (`src/aws_mcp_server/fleet_management/models.py`)
+Manages the inventory of AWS resources, providing a centralized registry for lookup and reference.
+
+### Integration Framework (`src/aws_mcp_server/fleet_management/integrations/integration.py`)
+Provides the foundation for integrating with external systems, APIs, and data sources.
+
+### API Server
+RESTful API endpoints for controlling and monitoring the fleet and integrations.
+
+---
+
+## Integration Framework
+
+The integration framework is a core component that enables the MCP Server to connect with external systems. It provides a pluggable architecture for adding new integration types.
+
+### Integration Types
+
+The framework supports the following integration types:
+
+1. **WEBHOOK**: HTTP callbacks for event notifications
+2. **REST_API**: Standard RESTful API integrations
+3. **GRAPHQL**: GraphQL API integrations
+4. **GRPC**: gRPC service integrations
+5. **EVENT_BUS**: Integration with event bus systems (e.g., Kafka, RabbitMQ)
+6. **MESSAGE_QUEUE**: Message queue integrations (e.g., SQS, ActiveMQ)
+7. **DATABASE**: Direct database integrations
+8. **FILE**: File system integrations
+9. **CUSTOM**: Custom integration types for specialized needs
+
+### Data Flow Directions
+
+Each integration can operate in one of three directions:
+
+1. **INBOUND**: External systems sending data to MCP Server
+2. **OUTBOUND**: MCP Server sending data to external systems
+3. **BIDIRECTIONAL**: Two-way communication between MCP Server and external systems
+
+### Integration Configuration
+
+Integrations are configured using a structured configuration model:
+
+```python
+@dataclass
+class IntegrationConfig:
+    name: str
+    description: str
+    type: IntegrationType
+    direction: Direction
+    version: str = "1.0.0"
+    auth: AuthConfig = field(default_factory=AuthConfig)
+    health_check: HealthCheckConfig = field(default_factory=HealthCheckConfig)
+    retry: RetryConfig = field(default_factory=RetryConfig)
+    timeout_seconds: int = 30
+    rate_limit_per_minute: int = 60
+    tags: Dict[str, str] = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    enabled: bool = True
+```
+
+### Authentication
+
+The framework supports multiple authentication mechanisms:
+
+1. **NONE**: No authentication
+2. **API_KEY**: API key authentication
+3. **BASIC**: HTTP Basic authentication
+4. **BEARER_TOKEN**: Bearer token authentication
+5. **OAUTH2**: OAuth 2.0 authentication
+6. **OAUTH1**: OAuth 1.0a authentication
+7. **AWS_SIG_V4**: AWS Signature Version 4
+8. **CERTIFICATE**: Client certificate authentication
+9. **CUSTOM**: Custom authentication mechanisms
+
+### Health Checks
+
+Integrations include configurable health checks:
+
+```python
+@dataclass
+class HealthCheckConfig:
+    enabled: bool = True
+    interval_seconds: int = 300
+    timeout_seconds: int = 30
+    failure_threshold: int = 3
+    success_threshold: int = 1
+    endpoint: Optional[str] = None
+    method: str = "GET"
+    expected_status_code: int = 200
+    body: Optional[str] = None
+    headers: Dict[str, str] = field(default_factory=dict)
+```
+
+Health checks are automatically executed in the background to monitor the status of integrations. The system manages:
+
+- Regular interval-based checks
+- Automatic marking of failed integrations
+- Recovery detection and status updates
+- Persistence of health check results
+
+### Retry Mechanisms
+
+The framework includes sophisticated retry handling:
+
+```python
+@dataclass
+class RetryConfig:
+    enabled: bool = True
+    max_attempts: int = 3
+    initial_backoff_seconds: float = 1.0
+    max_backoff_seconds: float = 60.0
+    backoff_multiplier: float = 2.0
+    retry_on_status_codes: List[int] = field(default_factory=lambda: [429, 500, 502, 503, 504])
+```
+
+Key retry features:
+- Exponential backoff with jitter
+- Configurable retry conditions
+- Maximum attempt limits
+- Status code-based retry decisions
+
+### Integration Registry
+
+The `IntegrationRegistry` class manages the lifecycle of integrations:
+
+- Registration of new integrations
+- Updates to existing integrations
+- Deletion of integrations
+- Lookup of integrations by ID, type, or status
+- Persistence of integration configurations
+- Automatic health check scheduling
+
+### Integration Lifecycle
+
+```
+┌─────────────┐
+│ CONFIGURING │
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐    ┌─────────────┐
+│   ACTIVE    │◄───┤   TESTING   │
+└──────┬──────┘    └─────────────┘
+       │
+       ▼
+┌─────────────┐    ┌─────────────┐
+│    ERROR    │◄───┤  INACTIVE   │
+└──────┬──────┘    └─────────────┘
+       │
+       ▼
+┌─────────────┐
+│ DEPRECATED  │
+└─────────────┘
+```
+
+---
+
+## API Layer
+
+The API layer provides RESTful endpoints for managing the fleet and integrations.
+
+### Integration Management API
+
+#### List Integrations
+```
+GET /api/v1/integrations
+```
+
+#### Get Integration
+```
+GET /api/v1/integrations/{integration_id}
+```
+
+#### Create Integration
+```
+POST /api/v1/integrations
+```
+
+#### Update Integration
+```
+PUT /api/v1/integrations/{integration_id}
+```
+
+#### Delete Integration
+```
+DELETE /api/v1/integrations/{integration_id}
+```
+
+#### Integration Health
+```
+GET /api/v1/integrations/{integration_id}/health
+```
+
+### Authentication and Authorization
+
+The API implements:
+- JWT-based authentication
+- Role-based access control
+- API key authentication for service-to-service communication
+- Rate limiting to prevent abuse
+
+---
 
 ## Getting Started
 
-### Option 1: Using Docker (Recommended)
+### Prerequisites
+
+- Python 3.9+
+- AWS CLI configured with appropriate credentials
+- Access to target AWS accounts
+- Docker (for containerized deployment)
+
+### Installation
 
 ```bash
-# Clone repository
-git clone https://github.com/uakbr/aws-mcp.git
-cd aws-mcp
-
-# Build and run Docker container
-docker compose -f deploy/docker/docker-compose.yml up -d
-```
-
-The Docker image supports both AMD64/x86_64 (Intel/AMD) and ARM64 (Apple Silicon M1-M4, AWS Graviton) architectures.
-
-> **Note**: The official image from GitHub Packages is multi-architecture and will automatically use the appropriate version for your system.
->
-> ```bash
-> # Use the latest stable version
-> docker pull ghcr.io/alexei-led/aws-mcp-server:latest
-> 
-> # Or pin to a specific version (recommended for production)
-> docker pull ghcr.io/alexei-led/aws-mcp-server:1.0.0
-> ```
->
-> **Docker Image Tags**:
->
-> - `latest`: Latest stable release
-> - `x.y.z` (e.g., `1.0.0`): Specific version
-> - `sha-abc123`: Development builds, tagged with Git commit SHA
-
-### Option 2: Using Python
-
-```bash
-# Clone repository
-git clone https://github.com/alexei-led/aws-mcp-server.git
+# Clone the repository
+git clone https://github.com/yourusername/aws-mcp-server.git
 cd aws-mcp-server
 
-# Set up virtual environment
+# Create a virtual environment
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Install in development mode
-pip install -e .
-
-# Run the server
-python -m aws_mcp_server
+# Install the package
+pip install -e ".[dev]"
 ```
 
-## Configuration
+### Configuration
 
-The AWS MCP Server can be configured using environment variables:
+1. Create a configuration file:
 
-| Environment Variable | Description | Default |
-|---------------------|-------------|---------|
-| `AWS_MCP_TIMEOUT` | Command execution timeout in seconds | 300 |
-| `AWS_MCP_MAX_OUTPUT` | Maximum output size in characters | 100000 |
-| `AWS_MCP_TRANSPORT` | Transport protocol to use ("stdio" or "sse") | stdio |
-| `AWS_PROFILE` | AWS profile to use | default |
-| `AWS_REGION` | AWS region to use | us-east-1 |
-
-## Integrating with Claude Desktop
-
-To integrate AWS MCP Server with Claude Desktop, you'll need to edit the Claude Desktop configuration file:
-
-1. **Locate the Claude Desktop configuration file**:
-   - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-   - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
-
-2. **Edit the configuration file** to include the AWS MCP Server:
-   ```json
-   {
-     "mcpServers": {
-       "aws-mcp-server": {
-         "command": "docker",
-         "args": [
-           "run",
-           "-i",
-           "--rm",
-           "-v",
-           "/Users/YOUR_USER_NAME/.aws:/home/appuser/.aws:ro",
-           "ghcr.io/alexei-led/aws-mcp-server:latest"
-         ]
-       }
-     }
-   }
-   ```
-
-3. **Restart Claude Desktop** to apply the changes
-   - After restarting, you should see a hammer 🔨 icon in the bottom right corner of the input box
-   - This indicates that the AWS MCP Server is available for use
-
-```mermaid
-flowchart TD
-    subgraph "User Device"
-        config[Edit claude_desktop_config.json]
-        claude[Claude Desktop]
-        docker[Docker Container]
-        aws_creds[AWS Credentials]
-    end
-    
-    subgraph "AWS Cloud"
-        services[AWS Services]
-    end
-    
-    config -->|Add MCP Server Config| claude
-    claude -->|Docker Run Command| docker
-    aws_creds -->|Mount Read-only| docker
-    docker -->|API Calls| services
+```yaml
+# config.yaml
+aws:
+  default_region: us-west-2
+  
+server:
+  host: 0.0.0.0
+  port: 8000
+  
+integrations:
+  data_dir: /path/to/integration/data
+  
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 ```
 
-### Example Interactions
-
-**Getting AWS CLI Documentation**:
-```
-User: What are the available options for the AWS S3 cp command?
-
-Claude: Let me get that information for you.
-
-The AWS S3 cp command has the following options:
-
-NAME
-    cp - Copies a local file or S3 object to another location locally or in S3.
-
-SYNOPSIS
-    cp <LocalPath> <S3Uri> or <S3Uri> <LocalPath> or <S3Uri> <S3Uri> [--acl <value>] [--cache-control <value>] ...
-```
-
-**Executing AWS CLI Commands**:
-```
-User: List my S3 buckets
-
-Claude: I'll list your S3 buckets for you.
-
-2023-10-15 14:30:45 my-bucket-1
-2023-11-20 09:15:32 my-bucket-2
-2024-01-05 11:22:18 my-backup-bucket
-```
-
-**Using Command Pipes**:
-```
-User: List my S3 buckets that have "backup" in their name and show them in alphabetical order
-
-Claude: Let me find that for you.
-
-2024-01-05 11:22:18 my-backup-bucket
-2024-03-01 09:44:12 weekly-backup-bucket
-2024-03-15 13:10:57 database-backup-bucket
-```
-
-**Using Prompt Templates**:
-```
-User: I need to perform a security audit of my S3 buckets
-
-Claude: I'll help you audit the security of your S3 buckets.
-
-Here are AWS CLI commands to perform a comprehensive security audit:
-
-# List all buckets with public access settings
-aws s3api list-buckets --query 'Buckets[*].Name' --output text | xargs -I {} aws s3api get-public-access-block --bucket {}
-
-# Check bucket policies for public access
-aws s3api list-buckets --query 'Buckets[*].Name' --output text | xargs -I {} aws s3api get-bucket-policy --bucket {} 2>/dev/null
-
-# Identify buckets without encryption
-aws s3api list-buckets --query 'Buckets[*].Name' --output text | xargs -I {} aws s3api get-bucket-encryption --bucket {} 2>/dev/null
-
-# Check for buckets without logging enabled
-aws s3api list-buckets --query 'Buckets[*].Name' --output text | xargs -I {} aws s3api get-bucket-logging --bucket {} 2>/dev/null
-
-# Verify bucket versioning status
-aws s3api list-buckets --query 'Buckets[*].Name' --output text | xargs -I {} aws s3api get-bucket-versioning --bucket {}
-```
-
-## Available Prompt Templates
-
-The AWS MCP Server includes the following pre-defined prompt templates:
-
-| Prompt | Description | Parameters |
-|--------|-------------|------------|
-| `create_resource` | Generate commands to create AWS resources with best practices | `resource_type`, `resource_name` |
-| `security_audit` | Audit security settings for a specific AWS service | `service` |
-| `cost_optimization` | Find cost optimization opportunities for a service | `service` |
-| `resource_inventory` | Create comprehensive inventory of resources | `service`, `region` (optional) |
-| `troubleshoot_service` | Generate commands to troubleshoot service issues | `service`, `resource_id` |
-| `iam_policy_generator` | Create least-privilege IAM policies | `service`, `actions`, `resource_pattern` (optional) |
-| `service_monitoring` | Set up comprehensive monitoring | `service`, `metric_type` (optional) |
-| `disaster_recovery` | Implement disaster recovery solutions | `service`, `recovery_point_objective` (optional) |
-| `compliance_check` | Check compliance with standards | `compliance_standard`, `service` (optional) |
-| `resource_cleanup` | Identify and safely clean up resources | `service`, `criteria` (optional) |
-
-## Security
-
-- The server uses AWS credentials from the host machine
-- All commands are validated before execution
-- Timeout limits prevent long-running commands
-- Commands must start with the 'aws' prefix
-- Potentially dangerous commands are restricted
-
-## Development
-
-### Setting Up the Development Environment
+2. Set environment variables:
 
 ```bash
-# Install only runtime dependencies
-pip install -e .
-
-# Install all development dependencies
-pip install -e ".[dev]"
-
-# Run unit tests
-pytest -k "not integration"
-
-# Run tests with coverage report
-pytest -k "not integration" --cov-report=html
-
-# Run linting
-ruff check src/ tests/
-
-# Run formatting
-ruff format src/ tests/
+export MCP_CONFIG_PATH=/path/to/config.yaml
+export AWS_PROFILE=your-profile  # Optional
 ```
 
-### Code Coverage
+### Running the Server
 
-The project includes configuration for [Codecov](https://codecov.io) to track code coverage metrics. The configuration is in the `codecov.yml` file, which:
+```bash
+# Start the server
+python -m aws_mcp_server.server
 
-- Sets a target coverage threshold of 80%
-- Excludes test files, setup files, and documentation from coverage reports
-- Configures PR comments and status checks
+# Or with specific config file
+python -m aws_mcp_server.server --config /path/to/config.yaml
+```
 
-Coverage reports are automatically generated during CI/CD runs and uploaded to Codecov.
+---
 
-### Integration Testing
+## Development Guide
 
-Integration tests verify AWS MCP Server works correctly with actual AWS resources. To run them:
+### Project Structure
 
-1. **Set up AWS resources**:
-   - Create an S3 bucket for testing
-   - Set the environment variable: `export AWS_TEST_BUCKET=your-test-bucket-name`
-   - Ensure your AWS credentials are configured
+```
+aws-mcp-server/
+├── src/
+│   └── aws_mcp_server/
+│       ├── __init__.py
+│       ├── cli_executor.py
+│       ├── server.py
+│       ├── config.py
+│       ├── fleet_management/
+│       │   ├── __init__.py
+│       │   ├── models.py
+│       │   ├── api/
+│       │   │   ├── __init__.py
+│       │   │   ├── router.py
+│       │   │   └── endpoints/
+│       │   └── integrations/
+│       │       ├── __init__.py
+│       │       ├── integration.py
+│       │       ├── rest.py
+│       │       ├── webhook.py
+│       │       └── ...
+├── tests/
+│   ├── __init__.py
+│   ├── test_cli_executor.py
+│   └── ...
+├── docs/
+│   ├── api.md
+│   ├── integrations.md
+│   └── ...
+├── pyproject.toml
+├── setup.py
+└── README.md
+```
 
-2. **Run integration tests**:
-   ```bash
-   # Run all tests including integration tests
-   pytest --run-integration
-   
-   # Run only integration tests
-   pytest --run-integration -m integration
-   ```
+### Adding a New Integration Type
+
+1. Create a new module in `src/aws_mcp_server/fleet_management/integrations/`
+2. Subclass the `Integration` base class
+3. Implement required methods
+4. Register the integration type with the registry
+
+Example:
+
+```python
+# src/aws_mcp_server/fleet_management/integrations/custom_type.py
+from .integration import Integration, IntegrationType
+
+class CustomIntegration(Integration):
+    async def initialize(self) -> bool:
+        # Custom initialization logic
+        return await super().initialize()
+    
+    async def health_check(self) -> bool:
+        # Custom health check logic
+        return await super().health_check()
+
+# Register with the registry
+async def register(registry):
+    await registry.register_plugin_type(
+        IntegrationType.CUSTOM,
+        CustomIntegration
+    )
+```
+
+### Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test module
+pytest tests/test_integrations.py
+
+# Run with coverage
+pytest --cov=aws_mcp_server
+```
+
+---
+
+## Deployment
+
+### Docker Deployment
+
+```bash
+# Build the Docker image
+docker build -t aws-mcp-server .
+
+# Run the container
+docker run -p 8000:8000 -v /path/to/config.yaml:/app/config.yaml aws-mcp-server
+```
+
+### AWS Deployment
+
+#### EC2 Deployment
+
+1. Launch an EC2 instance with appropriate IAM role
+2. Install dependencies and copy the application
+3. Configure the application
+4. Start the server with systemd or a similar service manager
+
+#### ECS Deployment
+
+1. Create an ECS cluster
+2. Create a task definition using the Docker image
+3. Configure environment variables and volumes
+4. Deploy the task as a service
+
+#### Lambda Deployment (API Components)
+
+1. Package the application for Lambda deployment
+2. Create Lambda functions for API endpoints
+3. Configure API Gateway integration
+4. Set up appropriate IAM roles and permissions
+
+---
+
+## Advanced Topics
+
+### Custom Authentication Providers
+
+The system allows custom authentication providers:
+
+```python
+from aws_mcp_server.fleet_management.integrations.integration import AuthType, AuthConfig
+
+class CustomAuthProvider:
+    def __init__(self, config: AuthConfig):
+        self.config = config
+    
+    async def authenticate(self, request):
+        # Custom authentication logic
+        pass
+
+# Register with auth providers
+async def register_auth_provider(registry):
+    registry.auth_providers[AuthType.CUSTOM] = CustomAuthProvider
+```
+
+### Event-Driven Integrations
+
+For event-driven integrations, the system provides specialized handling:
+
+```python
+from aws_mcp_server.fleet_management.integrations.integration import Integration
+
+class EventDrivenIntegration(Integration):
+    async def start_listening(self):
+        # Set up event listeners
+        pass
+    
+    async def process_event(self, event):
+        # Process incoming events
+        pass
+    
+    async def stop_listening(self):
+        # Clean up event listeners
+        pass
+```
+
+### Bulk Operations
+
+The system supports bulk operations for efficiency:
+
+```python
+# Bulk registration
+async def register_bulk(registry, configs):
+    results = {}
+    for config in configs:
+        try:
+            integration_id = await registry.register_integration(config)
+            results[config.name] = {
+                "success": True,
+                "id": integration_id
+            }
+        except Exception as e:
+            results[config.name] = {
+                "success": False,
+                "error": str(e)
+            }
+    return results
+```
+
+---
 
 ## Troubleshooting
 
-- **Authentication Issues**: Ensure your AWS credentials are properly configured
-- **Connection Errors**: Verify the server is running and AI assistant connection settings are correct
-- **Permission Errors**: Check that your AWS credentials have the necessary permissions
-- **Timeout Errors**: For long-running commands, increase the `AWS_MCP_TIMEOUT` environment variable
+### Common Issues
 
-## Why Deploy with Docker
+#### Integration Initialization Failures
 
-### Security Benefits
+**Symptoms:**
+- Integration status shows as ERROR
+- Initialization logs show connection failures
 
-- **Isolation**: The Docker container provides complete isolation - AWS CLI commands and utilities run in a contained environment, not directly on your local machine
-- **Controlled Access**: The container only has read-only access to your AWS credentials
-- **No Local Installation**: Avoid installing AWS CLI and supporting tools directly on your host system
-- **Clean Environment**: Each container run starts with a pristine, properly configured environment
+**Solutions:**
+1. Check network connectivity to the external system
+2. Verify authentication credentials
+3. Ensure the external system is available
+4. Review configuration parameters for accuracy
 
-### Reliability Advantages
+#### Health Check Failures
 
-- **Consistent Configuration**: All required tools (AWS CLI, SSM plugin, jq) are pre-installed and properly configured
-- **Dependency Management**: Avoid version conflicts between tools and dependencies
-- **Cross-Platform Consistency**: Works the same way across different operating systems
-- **Complete Environment**: Includes all necessary tools for command pipes, filtering, and formatting
+**Symptoms:**
+- Integration transitions from ACTIVE to ERROR
+- Health check logs show repeated failures
 
-### Other Benefits
+**Solutions:**
+1. Check the health check endpoint configuration
+2. Verify network connectivity
+3. Adjust health check parameters (interval, timeout)
+4. Check external system status
 
-- **Multi-Architecture Support**: Runs on both Intel/AMD (x86_64) and ARM (Apple Silicon, AWS Graviton) processors
-- **Simple Updates**: Update to new versions with a single pull command
-- **No Python Environment Conflicts**: Avoids potential conflicts with other Python applications on your system
-- **Version Pinning**: Easily pin to specific versions for stability in production environments
+#### Performance Issues
+
+**Symptoms:**
+- Slow response times
+- High CPU or memory usage
+
+**Solutions:**
+1. Adjust rate limiting parameters
+2. Optimize integration implementations
+3. Scale the server horizontally
+4. Implement caching where appropriate
+
+### Logging and Debugging
+
+The system uses Python's logging module with configurable levels:
+
+```python
+import logging
+
+# Set up logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+
+# Get a logger for a specific component
+logger = logging.getLogger("aws_mcp_server.fleet_management.integrations")
+```
+
+### Support and Resources
+
+- **Documentation**: Comprehensive documentation is available in the `docs/` directory
+- **Issue Tracker**: Report issues on GitHub
+- **Community Forums**: Discuss questions and share experiences
+- **Commercial Support**: Available for enterprise customers
+
+---
 
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+*This README was last updated on 2023-11-01.*
