@@ -689,14 +689,14 @@ class FilterStep(TransformStep):
     
     async def _filter_fields(self, item: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
         """
-        Filter an item to include only specified fields.
+        Extract only specified fields from the data.
         
         Args:
-            item: Item to filter
-            fields: Fields to include
+            item: Data item to filter
+            fields: List of field names to keep
             
         Returns:
-            Filtered item
+            Filtered data containing only specified fields
         """
         # If no fields specified, return the original item
         if not fields:
@@ -704,9 +704,9 @@ class FilterStep(TransformStep):
             
         # Create a new item with only the specified fields
         result = {}
-        for field in fields:
-            if field in item:
-                result[field] = item[field]
+        for field_name in fields:
+            if field_name in item:
+                result[field_name] = item[field_name]
         
         return result
 
@@ -940,8 +940,8 @@ class FormatConvertStep(TransformStep):
         
         for item in data:
             row_values = []
-            for field in fields:
-                value = item.get(field, "")
+            for field_name in fields:
+                value = item.get(field_name, "")
                 # Escape commas and quotes
                 if isinstance(value, str):
                     if "," in value or "\"" in value:
@@ -1388,4 +1388,61 @@ class TransformRegistry:
             error_behavior=step_data.get("error_behavior", "fail"),
             timeout_seconds=step_data.get("timeout_seconds", 30),
             retry_count=step_data.get("retry_count", 0)
-        ) 
+        )
+
+    def filter_fields(self, item: Dict[str, Any], fields: List[str]) -> Dict[str, Any]:
+        """
+        Extract only specified fields from the data.
+        
+        Args:
+            item: Data item to filter
+            fields: List of field names to keep
+            
+        Returns:
+            Filtered data containing only specified fields
+        """
+        # Create a new item with only the specified fields
+        result = {}
+        for field_name in fields:
+            if field_name in item:
+                result[field_name] = item[field_name]
+        
+        return result
+
+    def convert_to_csv(self, data: List[Dict[str, Any]], fields: List[str]) -> str:
+        """
+        Convert data to CSV format.
+        
+        Args:
+            data: List of data items to convert
+            fields: List of field names to include in CSV
+            
+        Returns:
+            CSV formatted string
+        """
+        if not data:
+            return ""
+        
+        # Generate CSV header
+        csv_lines = [",".join(fields)]
+        
+        # Generate rows
+        for item in data:
+            row_values = []
+            for field_name in fields:
+                value = item.get(field_name, "")
+                # Escape commas and quotes
+                if isinstance(value, str):
+                    # Double quotes to escape quotes
+                    value = value.replace('"', '""')
+                    # Quote if contains comma, newline, or quotes
+                    if "," in value or "\n" in value or '"' in value:
+                        value = f'"{value}"'
+                elif value is None:
+                    value = ""
+                else:
+                    value = str(value)
+                row_values.append(value)
+            csv_lines.append(",".join(row_values))
+        
+        return "\n".join(csv_lines) 

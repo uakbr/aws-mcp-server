@@ -229,7 +229,7 @@ class DeleteTransformPipelineTool(Tool):
                 return {
                     "pipeline_id": pipeline_id,
                     "success": True,
-                    "message": f"Pipeline deleted successfully"
+                    "message": "Pipeline deleted successfully"
                 }
             else:
                 return {

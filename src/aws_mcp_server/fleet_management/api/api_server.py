@@ -6,26 +6,25 @@ fleet management capabilities over HTTP.
 """
 
 import asyncio
-import logging
 import json
-from typing import Dict, List, Optional, Any, Union
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import List, Optional
 
 import uvicorn
-from fastapi import FastAPI, Depends, HTTPException, Request, status
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer
 
-from .auth import AuthManager, User, Permission
+from .auth import AuthManager, Permission, User
 from .rate_limiter import RateLimiter
-from ..monitoring import MetricRegistry, MetricManager
-from ..alerts import AlertRegistry, AlertManager
-from ..logs import LogManager
+from ..alerts import AlertRegistry
 from ..configuration import ConfigManager
 from ..deployment import DeploymentManager
+from ..logs import LogManager
 from ..models import ResourceRegistry
+from ..monitoring import MetricRegistry
 
 logger = logging.getLogger(__name__)
 

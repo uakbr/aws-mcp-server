@@ -1,7 +1,7 @@
 """
-Monitoring Framework for AWS Fleet Management.
+Monitoring System for AWS Fleet Management.
 
-This module provides capabilities to collect, aggregate, and manage
+This module provides capabilities to collect, aggregate, and analyze
 metrics across the fleet of AWS resources.
 """
 
@@ -557,24 +557,24 @@ class MetricManager:
             "unit": metric.unit
         }
         
-        # Calculate trend (simple linear regression)
-        if len(all_values) >= 2:
-            x = list(range(len(all_values)))
-            try:
-                from numpy import polyfit
-                slope, _ = polyfit(x, all_values, 1)
-                result["trend"] = "increasing" if slope > 0.01 else "decreasing" if slope < -0.01 else "stable"
-                result["trend_value"] = slope
-            except:
-                # Fallback if numpy is not available
-                # Simple trend calculation
-                first_half = all_values[:len(all_values)//2]
-                second_half = all_values[len(all_values)//2:]
-                first_avg = sum(first_half) / len(first_half)
-                second_avg = sum(second_half) / len(second_half)
-                
-                result["trend"] = "increasing" if second_avg > first_avg * 1.01 else "decreasing" if second_avg < first_avg * 0.99 else "stable"
-                result["trend_value"] = (second_avg - first_avg) / first_avg if first_avg != 0 else 0
+        # Calculate trend
+        try:
+            import numpy as np
+            # If we have numpy, use linear regression for trend
+            x = np.array(range(len(all_values)))
+            y = np.array(all_values)
+            slope, _, _, _, _ = np.polyfit(x, y, 1, full=True)
+            result["trend"] = "increasing" if slope > 0.01 else "decreasing" if slope < -0.01 else "stable"
+            result["trend_value"] = slope
+        except ImportError:
+            # Fallback if numpy is not available
+            # Simple trend calculation
+            if len(all_values) >= 2:
+                first_value = all_values[0]
+                last_value = all_values[-1]
+                diff = last_value - first_value
+                result["trend"] = "increasing" if diff > 0 else "decreasing" if diff < 0 else "stable"
+                result["trend_value"] = diff
         
         return result
 
@@ -637,7 +637,7 @@ def initialize_monitoring():
         priority=MetricPriority.MEDIUM
     )
     
-    logger.info(f"Initialized monitoring with default metrics: " + 
+    logger.info("Initialized monitoring with default metrics: " + 
                 f"CPU: {cpu_metric.id}, Memory: {memory_metric.id}, " +
                 f"Disk: {disk_metric.id}, Network In: {network_in_metric.id}, " +
                 f"Network Out: {network_out_metric.id}")

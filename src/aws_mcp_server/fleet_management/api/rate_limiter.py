@@ -1,18 +1,16 @@
 """
 Rate Limiter for API Layer.
 
-This module provides rate limiting for the API to prevent abuse and
-ensure fair usage of resources.
+This module provides rate limiting capabilities for the API server
+to protect against abuse and ensure fair resource usage.
 """
 
-import time
-import logging
 import asyncio
-from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from enum import Enum
-from typing import Dict, List, Optional, Any, Union, Set, Tuple
-from fastapi import Request, HTTPException, status
+import logging
+import time
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+from fastapi import HTTPException, Request, status
 
 from .auth import User
 
@@ -414,17 +412,16 @@ class RateLimiter:
                         return max(1, min(int(next_window - now) + 1, self.config.max_delay))
                     
                     # For sliding window, wait until enough requests expire from the window
-                    window_start = now - self.config.window_size
                     future_window_start = now + 1 - self.config.window_size
                     new_count = len([ts for ts in timestamps if ts >= future_window_start])
-                    requests_per_minute, _ = self._get_rate_limits(None if not user_id else User(id=user_id, username=""))
                     
+                    # If the rate limit would still be exceeded, return rate limit exceeded
                     if new_count >= requests_per_minute:
-                        # Calculate time until enough requests expire
-                        expired_needed = new_count - requests_per_minute + 1
-                        if expired_needed > 0 and len(timestamps) >= expired_needed:
-                            time_until_expire = timestamps[expired_needed - 1] + self.config.window_size - now
-                            return max(1, min(int(time_until_expire) + 1, self.config.max_delay))
+                        raise HTTPException(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail=f"Rate limit exceeded. Try again in {self.config.max_delay} seconds.",
+                            headers={"Retry-After": str(self.config.max_delay)}
+                        )
             
             # Check IP rate limits as well
             if ip_key in self.ip_request_counts:

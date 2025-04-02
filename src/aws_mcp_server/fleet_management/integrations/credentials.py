@@ -565,7 +565,7 @@ class CredentialManager:
             decrypted_data = self._cipher.decrypt(encrypted_data)
             backup_data = json.loads(decrypted_data.decode("utf-8"))
         except Exception as e:
-            raise ValueError(f"Failed to decrypt backup: {str(e)}")
+            raise ValueError(f"Failed to decrypt backup: {str(e)}") from e
         
         # Validate backup format
         if "credentials" not in backup_data or "metadata" not in backup_data:

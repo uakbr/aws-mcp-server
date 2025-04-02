@@ -1,21 +1,19 @@
 """
 API Tools for AWS MCP Server.
 
-This module provides tools for integrating the API layer with the
-AWS MCP Server's Model Context Protocol.
+This module provides tools for integrating the API capabilities
+with the AWS MCP Server's Model Context Protocol.
 """
 
-import json
 import asyncio
 import logging
-import subprocess
-from typing import Dict, List, Any, Optional, Union
-from dataclasses import asdict
+import os
+from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
-from .api_server import APIServer, APIConfig
-from .auth import AuthManager, AuthConfig, User, Role, Permission
-from .rate_limiter import RateLimiter, RateLimitConfig, UserRateLimit
+from .api_server import APIConfig, APIServer
+from .auth import AuthConfig, AuthManager
+from .rate_limiter import RateLimitConfig, RateLimiter, UserRateLimit
 
 logger = logging.getLogger(__name__)
 
@@ -564,109 +562,85 @@ class GetAPIStatusTool(Tool):
 class GenerateClientLibraryTool(Tool):
     """Tool for generating a client library for the API."""
     
-    def __init__(self, start_tool: StartAPIServerTool):
-        """
-        Initialize the tool.
-        
-        Args:
-            start_tool: The start API server tool instance
-        """
-        super().__init__(
-            name="generate_api_client",
-            schema=ToolSchema(
-                description="Generate a client library for the API",
-                parameters={
-                    "language": {
-                        "description": "The programming language for the client library",
-                        "type": "string",
-                        "enum": ["python", "javascript", "go", "java", "rust"]
-                    },
-                    "output_dir": {
-                        "description": "Directory to output the client library",
-                        "type": "string",
-                        "default": "./client"
-                    },
-                    "package_name": {
-                        "description": "Name of the client package",
-                        "type": "string",
-                        "default": "fleet_management_client"
-                    },
-                    "version": {
-                        "description": "Version of the client library",
-                        "type": "string",
-                        "default": "0.1.0"
-                    }
-                },
-                returns={
-                    "description": "Result of client library generation",
-                    "type": "object",
-                    "properties": {
-                        "status": {"type": "string"},
-                        "language": {"type": "string"},
-                        "output_dir": {"type": "string"},
-                        "files": {"type": "array"}
-                    }
-                }
-            )
-        )
+    name = "generate_client_library"
+    description = "Generate a client library for the API"
+    
+    schema = ToolSchema(
+        properties={
+            "language": {
+                "description": "Target language for the client library",
+                "type": "string",
+                "enum": ["javascript", "python"],
+                "default": "javascript"
+            },
+            "output_dir": {
+                "description": "Output directory",
+                "type": "string",
+                "default": "./client"
+            },
+            "package_name": {
+                "description": "Name of the client package",
+                "type": "string",
+                "default": "fleet-management-client"
+            },
+            "version": {
+                "description": "Version of the client library",
+                "type": "string",
+                "default": "0.1.0"
+            }
+        },
+        required=["language"]
+    )
+    
+    def __init__(self, start_tool):
+        """Initialize the tool with a start server tool."""
+        super().__init__()
         self._start_tool = start_tool
     
     async def _execute(self, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute the tool with the given parameters.
+        Generate a client library for the API.
         
-        Args:
-            parameters: Tool parameters
-            
-        Returns:
-            Tool execution result
+        This function creates client libraries in specified languages
+        to interact with the Fleet Management API.
         """
-        # Check if server is running
-        if not self._start_tool._server_instance:
-            return {
-                "error": "API server is not running"
-            }
-        
-        # Extract parameters
-        language = parameters.get("language")
+        language = parameters.get("language", "javascript")
         output_dir = parameters.get("output_dir", "./client")
-        package_name = parameters.get("package_name", "fleet_management_client")
         version = parameters.get("version", "0.1.0")
-        
-        if not language:
-            return {
-                "error": "Language is required"
-            }
+        package_name = parameters.get("package_name", "fleet-management-client")
         
         # Get OpenAPI spec from server
-        server = self._start_tool._server_instance
+        # We don't need to use server instance here
         
         # For now, we'll simulate generating a client library 
         # by creating a few template files
         import os
-        import subprocess
         
         os.makedirs(output_dir, exist_ok=True)
         
         files = []
         
-        if language == "python":
-            # Create Python client files
-            with open(f"{output_dir}/__init__.py", "w") as f:
-                f.write(f'''"""
-AWS Fleet Management API Client.
-
-Version: {version}
-"""
-
-from .client import FleetManagementClient
-
-__version__ = "{version}"
-''')
-                files.append(f"{output_dir}/__init__.py")
+        if language == "javascript":
+            # Create JavaScript client files
+            with open(f"{output_dir}/package.json", "w") as f:
+                f.write(f'''{{
+  "name": "{package_name}",
+  "version": "{version}",
+  "description": "Client library for AWS Fleet Management API",
+  "main": "index.js",
+  "scripts": {{
+    "test": "echo \\"Error: no test specified\\" && exit 1"
+  }},
+  "author": "",
+  "license": "MIT",
+  "dependencies": {{
+    "axios": "^0.24.0"
+  }}
+}}''')
+                files.append(f"{output_dir}/package.json")
             
             with open(f"{output_dir}/client.py", "w") as f:
-                f.write(f'''"""
+                f.write('''"""
 Fleet Management API Client implementation.
 """
 
@@ -689,7 +663,7 @@ class FleetManagementClient:
         self.session = requests.Session()
         
         if api_key:
-            self.session.headers.update({{"Authorization": f"Bearer {{api_key}}"}})
+            self.session.headers.update({"Authorization": f"Bearer {api_key}"})
     
     def login(self, username: str, password: str) -> str:
         """
@@ -703,15 +677,15 @@ class FleetManagementClient:
             Access token
         """
         response = self.session.post(
-            f"{{self.base_url}}/token",
-            json={{"username": username, "password": password}}
+            f"{self.base_url}/token",
+            json={"username": username, "password": password}
         )
         response.raise_for_status()
         data = response.json()
         
         token = data.get("access_token")
         if token:
-            self.session.headers.update({{"Authorization": f"Bearer {{token}}"}})
+            self.session.headers.update({"Authorization": f"Bearer {token}"})
         
         return token
     
@@ -722,7 +696,7 @@ class FleetManagementClient:
         Returns:
             List of resources
         """
-        response = self.session.get(f"{{self.base_url}}/resources", params=params)
+        response = self.session.get(f"{self.base_url}/resources", params=params)
         response.raise_for_status()
         return response.json().get("resources", [])
     
@@ -736,7 +710,7 @@ class FleetManagementClient:
         Returns:
             Resource details
         """
-        response = self.session.get(f"{{self.base_url}}/resources/{{resource_id}}")
+        response = self.session.get(f"{self.base_url}/resources/{resource_id}")
         response.raise_for_status()
         return response.json()
     
@@ -744,57 +718,8 @@ class FleetManagementClient:
 ''')
                 files.append(f"{output_dir}/client.py")
             
-            with open(f"{output_dir}/setup.py", "w") as f:
-                f.write(f'''
-from setuptools import setup, find_packages
-
-setup(
-    name="{package_name}",
-    version="{version}",
-    packages=find_packages(),
-    install_requires=[
-        "requests>=2.25.0",
-    ],
-    author="AWS MCP Server",
-    author_email="example@example.com",
-    description="Client library for AWS Fleet Management API",
-    keywords="aws, fleet, management, api",
-    url="https://github.com/example/aws-mcp-server",
-    classifiers=[
-        "Development Status :: 3 - Alpha",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.8",
-        "Programming Language :: Python :: 3.9",
-    ],
-    python_requires=">=3.8",
-)
-''')
-                files.append(f"{output_dir}/setup.py")
-        
-        elif language == "javascript":
-            # Create JavaScript client files
-            with open(f"{output_dir}/package.json", "w") as f:
-                f.write(f'''{{
-  "name": "{package_name}",
-  "version": "{version}",
-  "description": "Client library for AWS Fleet Management API",
-  "main": "index.js",
-  "scripts": {{
-    "test": "echo \\"Error: no test specified\\" && exit 1"
-  }},
-  "author": "",
-  "license": "MIT",
-  "dependencies": {{
-    "axios": "^0.24.0"
-  }}
-}}
-''')
-                files.append(f"{output_dir}/package.json")
-            
             with open(f"{output_dir}/index.js", "w") as f:
-                f.write(f'''/**
+                f.write('''/**
  * AWS Fleet Management API Client
  * @module fleet-management-client
  */
@@ -804,61 +729,61 @@ const axios = require('axios');
 /**
  * Client for the Fleet Management API
  */
-class FleetManagementClient {{
+class FleetManagementClient {
   /**
    * Create a new client instance
-   * @param {{string}} baseUrl - Base URL of the API
-   * @param {{string}} [apiKey] - Optional API key for authentication
+   * @param {string} baseUrl - Base URL of the API
+   * @param {string} [apiKey] - Optional API key for authentication
    */
-  constructor(baseUrl, apiKey) {{
-    this.baseUrl = baseUrl.replace(/\\/+$/, '');
+  constructor(baseUrl, apiKey) {
+    this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.apiKey = apiKey;
     
-    this.client = axios.create({{
+    this.client = axios.create({
       baseURL: this.baseUrl,
-      headers: apiKey ? {{ 'Authorization': `Bearer ${{apiKey}}` }} : {{}}
-    }});
-  }}
+      headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
+    });
+  }
   
   /**
    * Login to get an access token
-   * @param {{string}} username - Username for authentication
-   * @param {{string}} password - Password for authentication
-   * @returns {{Promise<string>}} Access token
+   * @param {string} username - Username for authentication
+   * @param {string} password - Password for authentication
+   * @returns {Promise<string>} Access token
    */
-  async login(username, password) {{
-    const response = await this.client.post('/token', {{ username, password }});
-    const {{ access_token: token }} = response.data;
+  async login(username, password) {
+    const response = await this.client.post('/token', { username, password });
+    const { access_token: token } = response.data;
     
-    if (token) {{
-      this.client.defaults.headers.common['Authorization'] = `Bearer ${{token}}`;
-    }}
+    if (token) {
+      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
     
     return token;
-  }}
+  }
   
   /**
    * Get resources matching the given parameters
-   * @param {{Object}} [params] - Query parameters
-   * @returns {{Promise<Array>}} List of resources
+   * @param {Object} [params] - Query parameters
+   * @returns {Promise<Array>} List of resources
    */
-  async getResources(params = {{}}) {{
-    const response = await this.client.get('/resources', {{ params }});
+  async getResources(params = {}) {
+    const response = await this.client.get('/resources', { params });
     return response.data.resources || [];
-  }}
+  }
   
   /**
    * Get a resource by ID
-   * @param {{string}} resourceId - ID of the resource
-   * @returns {{Promise<Object>}} Resource details
+   * @param {string} resourceId - ID of the resource
+   * @returns {Promise<Object>} Resource details
    */
-  async getResource(resourceId) {{
-    const response = await this.client.get(`/resources/${{resourceId}}`);
+  async getResource(resourceId) {
+    const response = await this.client.get(`/resources/${resourceId}`);
     return response.data;
-  }}
+  }
   
   // Add more methods for configurations, deployments, metrics, alerts, logs, etc.
-}}
+}
 
 module.exports = FleetManagementClient;
 ''')

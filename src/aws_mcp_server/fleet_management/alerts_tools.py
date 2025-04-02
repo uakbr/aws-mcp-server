@@ -5,15 +5,14 @@ This module provides tools for integrating alerting capabilities
 with the AWS MCP Server's Model Context Protocol.
 """
 
-import json
 import logging
 from datetime import datetime
 from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .alerts import (
-    AlertManager, AlertRegistry, AlertInstanceRegistry, 
-    AlertSeverity, AlertStatus, AlertState, ComparisonOperator
+    AlertManager, AlertRegistry,
+    AlertSeverity, AlertStatus, ComparisonOperator
 )
 
 logger = logging.getLogger(__name__)

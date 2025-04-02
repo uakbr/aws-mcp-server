@@ -1,7 +1,8 @@
 """
 Webhook Tools for AWS MCP Server.
 
-This module provides tools for managing webhooks for external system integrations.
+This module provides tools for integrating webhook capabilities
+with the AWS MCP Server's Model Context Protocol.
 """
 
 import json
@@ -290,13 +291,11 @@ class DeleteWebhookTool(Tool):
                 return {
                     "webhook_id": webhook_id,
                     "success": True,
-                    "message": f"Webhook deleted successfully"
+                    "message": "Webhook deleted successfully"
                 }
             else:
                 return {
-                    "webhook_id": webhook_id,
-                    "success": False,
-                    "message": f"Failed to delete webhook {webhook_id}"
+                    "error": f"Failed to delete webhook: {webhook_id}"
                 }
         except Exception as e:
             logger.error(f"Error deleting webhook: {str(e)}")

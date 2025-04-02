@@ -1,8 +1,8 @@
 """
 Log Management System for AWS Fleet Management.
 
-This module provides capabilities to collect, aggregate, parse, and search
-logs across the fleet of AWS resources.
+This module provides capabilities for collecting, searching, and analyzing
+logs from AWS resources across the fleet.
 """
 
 import json
@@ -456,7 +456,7 @@ class LogStore:
             return True
         
         # Check parsed fields
-        for field, value in entry.parsed_data.items():
+        for field_name, value in entry.parsed_data.items():
             if isinstance(value, str) and query_string.lower() in value.lower():
                 return True
         
@@ -761,6 +761,21 @@ def initialize_logs():
     """Initialize the log management system with default patterns and groups."""
     # Create log patterns
     
+    # Define commonly used log patterns
+    patterns = [
+        LogPattern(
+            id=f"pattern-{uuid.uuid4()}",
+            name="Access Log Pattern",
+            description="Pattern for HTTP access logs",
+            pattern=(
+                r'(?P<client_ip>\S+) - (?P<remote_user>\S+) '
+                r'\[(?P<timestamp>[^\]]+)\] '
+                r'"(?P<method>\S+) (?P<path>\S+) (?P<protocol>\S+)" '
+                r'(?P<status>\d+) (?P<bytes>\d+)'
+            )
+        ),
+    ]
+    
     # Apache/NGINX access log pattern
     access_log_pattern = LogManager.create_log_pattern(
         name="Access Log",
@@ -822,12 +837,12 @@ def initialize_logs():
         patterns=[log_level_pattern.id]
     )
     
-    logger.info(f"Initialized log management with default patterns: " +
+    logger.info("Initialized log management with default patterns: " +
                f"Access Log: {access_log_pattern.id}, " +
                f"Log Level: {log_level_pattern.id}, " +
                f"JSON Log: {json_log_pattern.id}")
     
-    logger.info(f"Initialized log management with default groups: " +
+    logger.info("Initialized log management with default groups: " +
                f"EC2 System: {ec2_syslog.id}, " +
                f"EC2 Application: {ec2_app_log.id}, " +
                f"Lambda: {lambda_log.id}, " +

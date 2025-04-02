@@ -10,11 +10,10 @@ import json
 import logging
 import asyncio
 import hashlib
-import hmac
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Union, Set
+from typing import Dict, List, Optional, Any, Set
 from pathlib import Path
 import jwt
 
@@ -343,7 +342,7 @@ class AuthManager:
             User if token is valid, None otherwise
         """
         try:
-            # Validate the token, but we don't need to use the payload here
+            # Validate the token
             jwt.decode(
                 token,
                 self.config.secret_key,
@@ -618,8 +617,8 @@ class AuthManager:
             try:
                 perm = Permission(perm_name)
                 permissions.append(perm)
-            except ValueError:
-                raise ValueError(f"Invalid permission name: {perm_name}")
+            except ValueError as err:
+                raise ValueError(f"Invalid permission name: {perm_name}") from err
                 
         # Create role
         self.roles[name] = Role(
@@ -665,8 +664,8 @@ class AuthManager:
                 try:
                     perm = Permission(perm_name)
                     permissions.append(perm)
-                except ValueError:
-                    raise ValueError(f"Invalid permission name: {perm_name}")
+                except ValueError as err:
+                    raise ValueError(f"Invalid permission name: {perm_name}") from err
             role.permissions = permissions
             
         # Save roles to file if configured
@@ -768,32 +767,9 @@ class AuthManager:
             role.permissions.append(perm)
         return True
 
-    def update_role(self, role_name: str, permissions: List[str]) -> bool:
-        """
-        Update a role's permissions.
-        
-        Args:
-            role_name: Name of the role
-            permissions: List of permission names
-            
-        Returns:
-            True if role was updated, False otherwise
-        """
-        # Check if role exists
-        role = self.roles.get(role_name)
-        if not role:
-            return False
-        
-        # Parse permissions
-        if permissions:
-            permissions_list = []
-            for perm_name in permissions:
-                try:
-                    perm = Permission[perm_name]
-                    permissions_list.append(perm)
-                except ValueError as err:
-                    raise ValueError(f"Invalid permission name: {perm_name}") from err
-            role.permissions = permissions_list
-        
-        self._save_data()
-        return True 
+    def _save_data(self):
+        """Save roles and users data to files if configured."""
+        if self.config.roles_file:
+            self._save_roles()
+        if self.config.users_file:
+            self._save_users() 
