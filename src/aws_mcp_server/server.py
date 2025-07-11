@@ -46,6 +46,16 @@ from aws_mcp_server.security.guardduty import GuardDutyClient, ThreatDetector, T
 from aws_mcp_server.security.iam_analyzer import IAMAnalyzer, RiskLevel
 from aws_mcp_server.security.secrets_manager import SecretsManagerClient, KMSClient, SecureCredentialManager, SecretType
 from aws_mcp_server.security.compliance import ComplianceScanner, ComplianceFramework
+from aws_mcp_server.cache import RedisCache, CacheConfig, CacheManager, cached
+from aws_mcp_server.connection_pool import get_connection_pool_manager, PoolConfig
+from aws_mcp_server.queue import (
+    app as celery_app,
+    get_task_info,
+    resource_discovery_async,
+    bulk_resource_update,
+    compliance_scan_async,
+    security_remediation_async,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
@@ -1946,4 +1956,410 @@ async def compliance_export_report(
         }
     except Exception as e:
         logger.error(f"Error exporting compliance report: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# Performance and Scalability Tools
+@mcp.tool()
+async def cache_get(
+    key: str = Field(description="Cache key to retrieve"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Retrieve value from Redis cache.
+    
+    Features:
+    - Fast key-value retrieval
+    - Automatic deserialization
+    - TTL information
+    """
+    try:
+        cache = RedisCache()
+        await cache.connect()
+        
+        value = await cache.get(key)
+        ttl = await cache.ttl(key)
+        
+        await cache.disconnect()
+        
+        if value is None:
+            return {
+                "status": "not_found",
+                "key": key,
+                "message": "Key not found in cache"
+            }
+        
+        return {
+            "status": "success",
+            "key": key,
+            "value": value,
+            "ttl": ttl if ttl > 0 else None,
+            "found": True
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving from cache: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def cache_set(
+    key: str = Field(description="Cache key"),
+    value: str = Field(description="JSON value to cache"),
+    ttl: int = Field(description="Time-to-live in seconds", default=3600),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Store value in Redis cache.
+    
+    Features:
+    - Key-value storage
+    - Configurable TTL
+    - Automatic serialization
+    """
+    import json
+    
+    try:
+        # Parse value as JSON
+        parsed_value = json.loads(value)
+        
+        cache = RedisCache()
+        await cache.connect()
+        
+        success = await cache.set(key, parsed_value, ttl=ttl)
+        
+        await cache.disconnect()
+        
+        if ctx:
+            await ctx.info(f"Cached key '{key}' with TTL {ttl}s")
+        
+        return {
+            "status": "success" if success else "failed",
+            "key": key,
+            "ttl": ttl,
+            "cached": success
+        }
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON value: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error setting cache: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def cache_invalidate(
+    pattern: str = Field(description="Cache key pattern to invalidate (supports wildcards)"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Invalidate cache entries matching pattern.
+    
+    Features:
+    - Pattern-based invalidation
+    - Wildcard support
+    - Batch deletion
+    """
+    try:
+        cache = RedisCache()
+        await cache.connect()
+        
+        if '*' in pattern:
+            # Pattern-based invalidation
+            import re
+            redis_pattern = pattern.replace('*', '.*')
+            keys = []
+            async for key in cache.redis.scan_iter(match=pattern):
+                keys.append(key.decode())
+            
+            deleted = 0
+            for key in keys:
+                if await cache.delete(key):
+                    deleted += 1
+        else:
+            # Single key deletion
+            deleted = 1 if await cache.delete(pattern) else 0
+        
+        await cache.disconnect()
+        
+        if ctx:
+            await ctx.info(f"Invalidated {deleted} cache entries")
+        
+        return {
+            "status": "success",
+            "pattern": pattern,
+            "invalidated": deleted
+        }
+    except Exception as e:
+        logger.error(f"Error invalidating cache: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def cache_stats(
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Get Redis cache statistics.
+    
+    Returns:
+    - Memory usage
+    - Key count
+    - Hit/miss ratio
+    - Connected clients
+    """
+    try:
+        cache = RedisCache()
+        await cache.connect()
+        
+        info = await cache.redis.info()
+        
+        await cache.disconnect()
+        
+        return {
+            "status": "success",
+            "stats": {
+                "used_memory_human": info.get("used_memory_human", "N/A"),
+                "used_memory_peak_human": info.get("used_memory_peak_human", "N/A"),
+                "connected_clients": info.get("connected_clients", 0),
+                "total_commands_processed": info.get("total_commands_processed", 0),
+                "instantaneous_ops_per_sec": info.get("instantaneous_ops_per_sec", 0),
+                "keyspace_hits": info.get("keyspace_hits", 0),
+                "keyspace_misses": info.get("keyspace_misses", 0),
+                "hit_rate": (
+                    info.get("keyspace_hits", 0) / 
+                    (info.get("keyspace_hits", 0) + info.get("keyspace_misses", 1))
+                    * 100
+                ) if info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0) > 0 else 0,
+                "evicted_keys": info.get("evicted_keys", 0),
+                "expired_keys": info.get("expired_keys", 0)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def connection_pool_stats(
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Get connection pool statistics for all AWS services.
+    
+    Returns:
+    - Pool health by service/region
+    - Request counts and latencies
+    - Success rates
+    - Pool ages
+    """
+    try:
+        pool_manager = get_connection_pool_manager()
+        
+        stats = await pool_manager.get_stats()
+        health = await pool_manager.health_check_all()
+        
+        return {
+            "status": "success",
+            "pools": stats,
+            "health": health,
+            "summary": {
+                "total_pools": len(stats),
+                "healthy_pools": sum(1 for h in health.values() if h),
+                "unhealthy_pools": sum(1 for h in health.values() if not h)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error getting pool stats: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def connection_pool_cleanup(
+    max_idle_seconds: int = Field(description="Clean up pools idle longer than this", default=300),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Clean up idle connection pools to free resources.
+    
+    Features:
+    - Automatic idle detection
+    - Resource cleanup
+    - Memory optimization
+    """
+    try:
+        pool_manager = get_connection_pool_manager()
+        
+        # Update config temporarily
+        original_idle = pool_manager.config.max_idle_seconds
+        pool_manager.config.max_idle_seconds = max_idle_seconds
+        
+        cleaned = await pool_manager.cleanup_idle_pools()
+        
+        # Restore original config
+        pool_manager.config.max_idle_seconds = original_idle
+        
+        if ctx:
+            await ctx.info(f"Cleaned up {cleaned} idle connection pools")
+        
+        return {
+            "status": "success",
+            "cleaned_pools": cleaned,
+            "max_idle_seconds": max_idle_seconds
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning up pools: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def submit_async_job(
+    job_type: str = Field(description="Type of job (resource_discovery, bulk_update, compliance_scan, security_remediation)"),
+    job_params: str = Field(description="JSON parameters for the job"),
+    priority: str = Field(description="Job priority (high, default, low)", default="default"),
+    callback_url: str = Field(description="Optional webhook URL for completion notification", default=None),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Submit an asynchronous job to the Celery queue.
+    
+    Job types:
+    - resource_discovery: Discover AWS resources across regions
+    - bulk_update: Update multiple resources in bulk
+    - compliance_scan: Run compliance scans
+    - security_remediation: Remediate security findings
+    """
+    import json
+    
+    try:
+        params = json.loads(job_params)
+        
+        # Add callback URL if provided
+        if callback_url:
+            params["callback_url"] = callback_url
+        
+        # Map job type to task
+        task_map = {
+            "resource_discovery": resource_discovery_async,
+            "bulk_update": bulk_resource_update,
+            "compliance_scan": compliance_scan_async,
+            "security_remediation": security_remediation_async
+        }
+        
+        if job_type not in task_map:
+            return {
+                "status": "error",
+                "message": f"Unknown job type: {job_type}"
+            }
+        
+        # Submit task
+        task = task_map[job_type]
+        
+        # Set priority via queue
+        queue_map = {
+            "high": "high_priority",
+            "low": "low_priority",
+            "default": "default"
+        }
+        queue = queue_map.get(priority, "default")
+        
+        result = task.apply_async(kwargs=params, queue=queue)
+        
+        if ctx:
+            await ctx.info(f"Submitted {job_type} job: {result.id}")
+        
+        return {
+            "status": "success",
+            "job_id": result.id,
+            "job_type": job_type,
+            "priority": priority,
+            "state": "PENDING"
+        }
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON parameters: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error submitting job: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def get_job_status(
+    job_id: str = Field(description="Job ID to check status"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Get status and results of an async job.
+    
+    Returns:
+    - Job state (PENDING, PROGRESS, SUCCESS, FAILURE)
+    - Progress information
+    - Results if completed
+    - Error details if failed
+    """
+    try:
+        info = get_task_info(job_id)
+        
+        # Add more details based on state
+        if info["state"] == "PROGRESS" and info.get("info"):
+            # Add progress details
+            progress_info = info["info"]
+            info["progress"] = {
+                "current": progress_info.get("current", 0),
+                "total": progress_info.get("total", 0),
+                "percent": progress_info.get("percent", 0),
+                "message": progress_info.get("message", "")
+            }
+        
+        return {
+            "status": "success",
+            **info
+        }
+    except Exception as e:
+        logger.error(f"Error getting job status: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def cancel_async_job(
+    job_id: str = Field(description="Job ID to cancel"),
+    terminate: bool = Field(description="Force terminate if running", default=False),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Cancel or terminate an async job.
+    
+    Features:
+    - Graceful cancellation
+    - Force termination option
+    - Status verification
+    """
+    try:
+        # First check current status
+        info = get_task_info(job_id)
+        
+        if info["ready"]:
+            return {
+                "status": "error",
+                "message": f"Job already completed with state: {info['state']}"
+            }
+        
+        # Revoke the task
+        success = revoke_task(job_id, terminate=terminate)
+        
+        if ctx:
+            action = "terminated" if terminate else "cancelled"
+            await ctx.info(f"Job {job_id} {action}")
+        
+        return {
+            "status": "success" if success else "failed",
+            "job_id": job_id,
+            "action": "terminated" if terminate else "cancelled",
+            "previous_state": info["state"]
+        }
+    except Exception as e:
+        logger.error(f"Error cancelling job: {e}")
         return {"status": "error", "message": str(e)}
