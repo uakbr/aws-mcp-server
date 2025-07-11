@@ -38,6 +38,8 @@ from aws_mcp_server.progress import (
     discover_resources_with_progress,
     track_multi_region_operation
 )
+from aws_mcp_server.automation import IntelligentAutomation
+from aws_mcp_server.ml_ai import MLAIEngine
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
@@ -655,3 +657,750 @@ async def batch_tag_resources(
 
 # Import datetime for the tools
 from datetime import datetime
+
+
+# Intelligent Automation Tools
+@mcp.tool()
+async def auto_remediate_security(
+    resource_type: str = Field(description="Type of resource to remediate (security_group, s3_bucket)"),
+    resource_id: str = Field(description="ID or name of the resource"),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Automatically remediate common security issues.
+    
+    Supported remediations:
+    - Security Groups: Remove unrestricted access, add egress rules
+    - S3 Buckets: Enable versioning, encryption, block public access
+    """
+    if ctx:
+        await ctx.info(f"Starting auto-remediation for {resource_type}: {resource_id}")
+    
+    automation = IntelligentAutomation()
+    
+    try:
+        if resource_type == "security_group":
+            result = await automation.auto_remediate_security_group(resource_id, region)
+        elif resource_type == "s3_bucket":
+            result = await automation.auto_remediate_s3_bucket(resource_id)
+        else:
+            return {
+                "status": "error",
+                "message": f"Unsupported resource type: {resource_type}"
+            }
+        
+        if ctx and result.get("status") == "success":
+            await ctx.info(f"Successfully applied {result.get('remediation_count', 0)} remediations")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in auto-remediation: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def predict_scaling_needs(
+    resource_type: str = Field(description="Type of resource (ec2, rds)"),
+    resource_id: str = Field(description="Resource ID to analyze"),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    lookback_days: int = Field(description="Days of historical data to analyze", default=7),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Analyze historical metrics to predict scaling needs.
+    
+    Uses CloudWatch metrics to:
+    - Analyze usage patterns
+    - Detect trends
+    - Recommend scaling actions
+    """
+    if ctx:
+        await ctx.info(f"Analyzing scaling patterns for {resource_type}: {resource_id}")
+    
+    automation = IntelligentAutomation()
+    
+    try:
+        result = await automation.predictive_scaling_analysis(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            region=region,
+            lookback_days=lookback_days
+        )
+        
+        if ctx:
+            recommendation = result.get("overall_recommendation", "Analysis complete")
+            await ctx.info(f"Scaling analysis: {recommendation}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error in scaling prediction: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def detect_cost_anomalies(
+    threshold_percentage: float = Field(description="Percentage increase to consider anomalous", default=20.0),
+    account_id: str = Field(description="AWS account ID (optional)", default=None),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Detect unusual cost increases in AWS spending.
+    
+    Analyzes:
+    - Daily cost trends by service
+    - Compares recent spending to baseline
+    - Identifies services with unusual cost spikes
+    """
+    if ctx:
+        await ctx.info(f"Detecting cost anomalies with {threshold_percentage}% threshold")
+    
+    automation = IntelligentAutomation()
+    
+    try:
+        result = await automation.detect_cost_anomalies(
+            account_id=account_id,
+            threshold_percentage=threshold_percentage
+        )
+        
+        if ctx:
+            anomaly_count = result.get("total_anomalies", 0)
+            if anomaly_count > 0:
+                await ctx.warning(f"Detected {anomaly_count} cost anomalies")
+            else:
+                await ctx.info("No cost anomalies detected")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error detecting cost anomalies: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def create_automation_rule(
+    rule_name: str = Field(description="Name for the automation rule"),
+    trigger_type: str = Field(description="Type of trigger (threshold, schedule, event)"),
+    trigger_config: str = Field(description="JSON configuration for the trigger"),
+    conditions: str = Field(description="JSON array of conditions"),
+    actions: str = Field(description="JSON array of actions to execute"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Create an automation rule for AWS resources.
+    
+    Example conditions:
+    - {"type": "threshold", "metric": "cpu_usage", "threshold": 80, "operator": ">"}
+    
+    Example actions:
+    - {"type": "scale_ec2", "instance_id": "i-xxx", "instance_type": "t3.large"}
+    - {"type": "send_notification", "message": "High CPU alert: {metric_value}%"}
+    """
+    if ctx:
+        await ctx.info(f"Creating automation rule: {rule_name}")
+    
+    import json
+    
+    try:
+        trigger_config_dict = json.loads(trigger_config)
+        conditions_list = json.loads(conditions)
+        actions_list = json.loads(actions)
+        
+        automation = IntelligentAutomation()
+        
+        rule = await automation.create_automation_rule(
+            rule_name=rule_name,
+            trigger_type=trigger_type,
+            trigger_config=trigger_config_dict,
+            conditions=conditions_list,
+            actions=actions_list
+        )
+        
+        if ctx:
+            await ctx.info(f"Successfully created automation rule: {rule.rule_id}")
+        
+        return {
+            "status": "success",
+            "rule_id": rule.rule_id,
+            "rule_name": rule.name,
+            "enabled": rule.enabled,
+            "created_at": rule.created_at.isoformat()
+        }
+        
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON in parameters: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error creating automation rule: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+# Machine Learning and AI Tools
+@mcp.tool()
+async def setup_timestream_ml(
+    database_name: str = Field(description="TimeStream database name for ML data"),
+    table_name: str = Field(description="TimeStream table name"),
+    memory_retention_hours: int = Field(description="Hours to retain data in memory store", default=12),
+    magnetic_retention_days: int = Field(description="Days to retain data in magnetic store", default=365),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Set up TimeStream database and table for ML time series data.
+    
+    Perfect for:
+    - Storing model training metrics over time
+    - Real-time inference data
+    - Performance monitoring
+    - Anomaly detection on time series
+    """
+    if ctx:
+        await ctx.info(f"Setting up TimeStream for ML: {database_name}/{table_name}")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        # Create database
+        db_result = await ml_engine.create_timestream_database(database_name, region)
+        
+        # Create table
+        table_result = await ml_engine.create_timestream_table(
+            database_name=database_name,
+            table_name=table_name,
+            memory_retention_hours=memory_retention_hours,
+            magnetic_retention_days=magnetic_retention_days,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Successfully created TimeStream setup for ML data")
+        
+        return {
+            "status": "success",
+            "database": db_result,
+            "table": table_result
+        }
+        
+    except Exception as e:
+        logger.error(f"Error setting up TimeStream: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def log_ml_metrics(
+    database_name: str = Field(description="TimeStream database name"),
+    table_name: str = Field(description="TimeStream table name"),
+    metrics: str = Field(description="JSON array of metrics to log"),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Log ML training or inference metrics to TimeStream.
+    
+    Metrics format:
+    [{
+        "metric_name": "accuracy",
+        "value": 0.95,
+        "dimensions": {"model": "bert-classifier", "epoch": "10"},
+        "timestamp": "2024-01-20T10:30:00Z"
+    }]
+    """
+    import json
+    
+    try:
+        metrics_list = json.loads(metrics)
+        
+        # Convert timestamp strings to datetime objects
+        for metric in metrics_list:
+            if 'timestamp' in metric and isinstance(metric['timestamp'], str):
+                metric['timestamp'] = datetime.fromisoformat(metric['timestamp'].replace('Z', '+00:00'))
+        
+        ml_engine = MLAIEngine()
+        result = await ml_engine.write_ml_metrics_to_timestream(
+            database_name=database_name,
+            table_name=table_name,
+            metrics=metrics_list,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Logged {result['records_written']} ML metrics to TimeStream")
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON in metrics: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error logging ML metrics: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def train_sagemaker_model(
+    job_name: str = Field(description="Name for the training job"),
+    algorithm_image: str = Field(description="ECR URI of the training algorithm"),
+    input_data_s3: str = Field(description="S3 URI for training data"),
+    output_data_s3: str = Field(description="S3 URI for model artifacts"),
+    instance_type: str = Field(description="Instance type for training", default="ml.m5.xlarge"),
+    hyperparameters: str = Field(description="JSON string of hyperparameters", default="{}"),
+    role_arn: str = Field(description="IAM role ARN for SageMaker", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Create and start a SageMaker training job.
+    
+    Supports:
+    - Custom algorithms in ECR
+    - Built-in algorithms (XGBoost, Linear Learner, etc.)
+    - Distributed training
+    - Spot instances for cost savings
+    """
+    if ctx:
+        await ctx.info(f"Starting SageMaker training job: {job_name}")
+    
+    import json
+    
+    try:
+        hyperparams = json.loads(hyperparameters)
+        
+        ml_engine = MLAIEngine()
+        result = await ml_engine.create_sagemaker_training_job(
+            job_name=job_name,
+            algorithm_image=algorithm_image,
+            input_data_s3=input_data_s3,
+            output_data_s3=output_data_s3,
+            instance_type=instance_type,
+            hyperparameters=hyperparams,
+            role_arn=role_arn,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Training job started with pipeline ID: {result['pipeline_id']}")
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON in hyperparameters: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error starting SageMaker training: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def deploy_sagemaker_endpoint(
+    model_name: str = Field(description="Name for the model and endpoint"),
+    model_data_s3: str = Field(description="S3 URI of trained model artifacts"),
+    container_image: str = Field(description="ECR URI of inference container"),
+    instance_type: str = Field(description="Instance type for endpoint", default="ml.m5.large"),
+    instance_count: int = Field(description="Number of instances", default=1),
+    role_arn: str = Field(description="IAM role ARN for SageMaker", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Deploy a trained model to a SageMaker real-time endpoint.
+    
+    Features:
+    - Auto-scaling capabilities
+    - A/B testing with multiple models
+    - Built-in monitoring
+    - Low latency inference
+    """
+    if ctx:
+        await ctx.info(f"Deploying model to SageMaker endpoint: {model_name}")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        result = await ml_engine.deploy_sagemaker_model(
+            model_name=model_name,
+            model_data_s3=model_data_s3,
+            container_image=container_image,
+            instance_type=instance_type,
+            initial_instance_count=instance_count,
+            role_arn=role_arn,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Endpoint deployment initiated: {result['endpoint_name']}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error deploying SageMaker endpoint: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def list_bedrock_models(
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    List available Bedrock foundation models.
+    
+    Includes:
+    - Claude (Anthropic)
+    - Llama (Meta)
+    - Titan (Amazon)
+    - Stable Diffusion (Stability AI)
+    - And more...
+    """
+    if ctx:
+        await ctx.info("Listing available Bedrock foundation models")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        result = await ml_engine.list_bedrock_models(region)
+        
+        if ctx:
+            await ctx.info(f"Found {result['model_count']} Bedrock models")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error listing Bedrock models: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def finetune_bedrock_model(
+    job_name: str = Field(description="Name for the fine-tuning job"),
+    base_model_id: str = Field(description="ID of the base model to fine-tune"),
+    training_data_s3: str = Field(description="S3 URI of training data in JSONL format"),
+    output_s3: str = Field(description="S3 URI for output model"),
+    hyperparameters: str = Field(description="JSON string of hyperparameters", default="{}"),
+    role_arn: str = Field(description="IAM role ARN for Bedrock", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Fine-tune a Bedrock foundation model on custom data.
+    
+    Supports fine-tuning:
+    - Claude for specialized tasks
+    - Llama for domain-specific applications
+    - Titan for custom embeddings
+    """
+    if ctx:
+        await ctx.info(f"Starting Bedrock fine-tuning job: {job_name}")
+    
+    import json
+    
+    try:
+        hyperparams = json.loads(hyperparameters) if hyperparameters else {}
+        
+        ml_engine = MLAIEngine()
+        result = await ml_engine.create_bedrock_fine_tuning_job(
+            job_name=job_name,
+            base_model_id=base_model_id,
+            training_data_s3=training_data_s3,
+            output_s3=output_s3,
+            hyperparameters=hyperparams,
+            role_arn=role_arn,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Fine-tuning job started with pipeline ID: {result['pipeline_id']}")
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON in hyperparameters: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error starting Bedrock fine-tuning: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def invoke_bedrock(
+    model_id: str = Field(description="Bedrock model ID to invoke"),
+    prompt: str = Field(description="Prompt for the model"),
+    max_tokens: int = Field(description="Maximum tokens to generate", default=512),
+    temperature: float = Field(description="Temperature for sampling", default=0.7),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Invoke a Bedrock model for inference.
+    
+    Use for:
+    - Text generation with Claude, Llama, etc.
+    - Code generation
+    - Summarization
+    - Question answering
+    - And more...
+    """
+    if ctx:
+        await ctx.info(f"Invoking Bedrock model: {model_id}")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        result = await ml_engine.invoke_bedrock_model(
+            model_id=model_id,
+            prompt=prompt,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info("Bedrock inference completed successfully")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error invoking Bedrock: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def prepare_ml_dataset(
+    source_bucket: str = Field(description="Source S3 bucket name"),
+    source_prefix: str = Field(description="Source prefix for data files"),
+    dest_bucket: str = Field(description="Destination S3 bucket"),
+    dest_prefix: str = Field(description="Destination prefix"),
+    train_ratio: float = Field(description="Training data ratio", default=0.7),
+    val_ratio: float = Field(description="Validation data ratio", default=0.2),
+    test_ratio: float = Field(description="Test data ratio", default=0.1),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Prepare and organize ML dataset in S3 with train/val/test splits.
+    
+    Automatically:
+    - Shuffles data
+    - Creates train/validation/test directories
+    - Maintains data balance
+    - Preserves file formats
+    """
+    if ctx:
+        await ctx.info(f"Preparing ML dataset from s3://{source_bucket}/{source_prefix}")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        result = await ml_engine.prepare_ml_dataset(
+            source_bucket=source_bucket,
+            source_prefix=source_prefix,
+            dest_bucket=dest_bucket,
+            dest_prefix=dest_prefix,
+            split_ratio=(train_ratio, val_ratio, test_ratio),
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Dataset prepared: {result['train_files']} train, "
+                          f"{result['validation_files']} val, {result['test_files']} test files")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error preparing ML dataset: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def create_automl_job(
+    pipeline_name: str = Field(description="Name for the AutoML pipeline"),
+    data_s3_uri: str = Field(description="S3 URI of training data CSV"),
+    target_column: str = Field(description="Name of the target column to predict"),
+    problem_type: str = Field(description="ML problem type", default="BinaryClassification"),
+    objective_metric: str = Field(description="Optimization metric", default="F1"),
+    max_candidates: int = Field(description="Maximum models to try", default=10),
+    role_arn: str = Field(description="IAM role ARN for SageMaker", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Create an AutoML job using SageMaker Autopilot.
+    
+    Automatically:
+    - Analyzes your data
+    - Engineers features
+    - Selects algorithms
+    - Tunes hyperparameters
+    - Provides model explainability
+    
+    Problem types: BinaryClassification, MulticlassClassification, Regression
+    """
+    if ctx:
+        await ctx.info(f"Starting AutoML pipeline: {pipeline_name}")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        result = await ml_engine.create_automl_pipeline(
+            pipeline_name=pipeline_name,
+            data_s3_uri=data_s3_uri,
+            target_column=target_column,
+            problem_type=problem_type,
+            objective_metric=objective_metric,
+            max_candidates=max_candidates,
+            role_arn=role_arn,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"AutoML job created. Estimated completion: {result['estimated_completion_time']}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error creating AutoML job: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def create_feature_store(
+    feature_group_name: str = Field(description="Name for the feature group"),
+    s3_uri: str = Field(description="S3 URI for offline feature storage"),
+    record_identifier: str = Field(description="Column name for record ID"),
+    event_time_feature: str = Field(description="Column name for event timestamp"),
+    features: str = Field(description="JSON array of feature definitions"),
+    role_arn: str = Field(description="IAM role ARN for SageMaker", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Create a SageMaker Feature Store for ML features.
+    
+    Benefits:
+    - Centralized feature storage
+    - Real-time and batch serving
+    - Feature versioning
+    - Consistency between training and inference
+    
+    Features format:
+    [{"name": "user_id", "type": "String"},
+     {"name": "purchase_amount", "type": "Fractional"},
+     {"name": "item_count", "type": "Integral"}]
+    """
+    if ctx:
+        await ctx.info(f"Creating feature store: {feature_group_name}")
+    
+    import json
+    
+    try:
+        features_list = json.loads(features)
+        
+        ml_engine = MLAIEngine()
+        result = await ml_engine.create_feature_store(
+            feature_group_name=feature_group_name,
+            s3_uri=s3_uri,
+            record_identifier=record_identifier,
+            event_time_feature=event_time_feature,
+            features=features_list,
+            role_arn=role_arn,
+            region=region
+        )
+        
+        if ctx:
+            await ctx.info(f"Feature store created with {result['feature_count']} features")
+        
+        return result
+        
+    except json.JSONDecodeError as e:
+        return {
+            "status": "error",
+            "message": f"Invalid JSON in features: {str(e)}"
+        }
+    except Exception as e:
+        logger.error(f"Error creating feature store: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+
+
+@mcp.tool()
+async def get_ml_pipeline_status(
+    pipeline_id: str = Field(description="Pipeline ID to check status"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Get the status of any ML training pipeline.
+    
+    Works with:
+    - SageMaker training jobs
+    - Bedrock fine-tuning jobs
+    - AutoML pipelines
+    """
+    if ctx:
+        await ctx.info(f"Checking ML pipeline status: {pipeline_id}")
+    
+    ml_engine = MLAIEngine()
+    
+    try:
+        result = await ml_engine.get_ml_pipeline_status(pipeline_id)
+        
+        if ctx:
+            await ctx.info(f"Pipeline status: {result.get('status', 'unknown')}")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error getting pipeline status: {e}")
+        return {
+            "status": "error",
+            "message": str(e)
+        }
