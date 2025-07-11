@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # AWS MCP Server Development Guide
 
 ## Build & Test Commands
@@ -9,8 +13,12 @@
 - Run with MCP CLI: `mcp run src/aws_mcp_server/server.py`
 - Run tests: `pytest`
 - Run single test: `pytest tests/path/to/test_file.py::test_function_name -v`
+- Run unit tests only: `pytest tests/unit/`
+- Run integration tests: `pytest --run-integration` (requires AWS credentials)
 - Run linter: `ruff check src/ tests/`
 - Format code: `ruff format src/ tests/`
+- Build Docker image: `docker build -t aws-mcp-server .`
+- Run Docker container: `docker run -e AWS_PROFILE=your-profile -v ~/.aws:/root/.aws:ro aws-mcp-server`
 
 ## Technical Stack
 
@@ -18,13 +26,16 @@
 - **Project config**: `pyproject.toml` for configuration and dependency management
 - **Environment**: Use virtual environment in `.venv` for dependency isolation
 - **Dependencies**: Separate production and dev dependencies in `pyproject.toml`
-- **Linting**: `ruff` for style and error checking
+- **Linting**: `ruff` for style and error checking (E, F, I, B rules enabled)
 - **Type checking**: Use VS Code with Pylance for static type checking
+- **Testing**: `pytest` with `moto` for AWS service mocking
 - **Project layout**: Organize code with `src/` layout
+- **Test markers**: `integration` (requires AWS), `asyncio` (async tests)
 
 ## Code Style Guidelines
 
 - **Formatting**: Black-compatible formatting via `ruff format`
+- **Line length**: 160 characters maximum
 - **Imports**: Sort imports with `ruff` (stdlib, third-party, local)
 - **Type hints**: Use native Python type hints (e.g., `list[str]` not `List[str]`)
 - **Documentation**: Google-style docstrings for all modules, classes, functions
@@ -65,3 +76,32 @@
 - **Version control**: Commit frequently with clear messages
 - **Impact assessment**: Evaluate how changes affect other codebase areas
 - **Documentation**: Keep documentation up-to-date for complex logic and features
+
+## Codebase Architecture
+
+### Core MCP Server (`src/aws_mcp_server/`)
+- **server.py**: Main MCP server implementation with FastMCP
+- **cli_executor.py**: AWS CLI command execution with validation and security
+- **tools.py**: MCP tool definitions for AWS operations
+- **config.py**: Configuration management using environment variables
+- **prompts.py**: User-facing prompt templates
+
+### Fleet Management Module (`src/aws_mcp_server/fleet_management/`)
+Advanced features for multi-account AWS resource management:
+- **api/**: REST API server with authentication and rate limiting
+- **integrations/**: External system integration framework (REST, webhook, GraphQL, gRPC)
+- **monitoring/**: CloudWatch metrics and alerting
+- **config/**: Hierarchical configuration with inheritance
+- **deployment/**: Template-based deployment automation
+- **logging/**: Centralized log collection and analysis
+
+### Testing Structure
+- **tests/unit/**: Unit tests using mocks (run by default)
+- **tests/integration/**: Integration tests requiring AWS credentials (use `--run-integration`)
+- **tests/conftest.py**: Shared pytest fixtures and configuration
+
+### Key Design Patterns
+- **Asynchronous-first**: All server operations use async/await
+- **Layered architecture**: Presentation → API → Service → Integration layers
+- **Domain-driven design**: Organized around business capabilities
+- **Security by default**: Input validation, credential protection, audit logging
