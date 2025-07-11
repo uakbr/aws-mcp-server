@@ -10,6 +10,7 @@ from typing import Any, Dict
 
 from ..tools import Tool, ToolSchema
 from .discovery import discover_all_resources
+from .aws_discovery import AWSResourceDiscovery
 from .models import ResourceRegistry
 
 logger = logging.getLogger(__name__)
@@ -34,47 +35,79 @@ class DiscoverResourcesTool(FleetManagementTool):
             "resource_types": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Types of resources to discover (e.g. ec2, s3, rds)"
+                "description": "Types of resources to discover (e.g. ec2, s3, rds, lambda)"
             },
             "regions": {
                 "type": "array", 
                 "items": {"type": "string"},
-                "description": "AWS regions to scan"
+                "description": "AWS regions to scan (defaults to all available regions)"
             },
             "max_items": {
                 "type": "integer",
                 "description": "Maximum number of resources to return per type"
+            },
+            "assume_role_arn": {
+                "type": "string",
+                "description": "ARN of IAM role to assume for cross-account access"
+            },
+            "external_id": {
+                "type": "string",
+                "description": "External ID for role assumption (if required)"
             }
         }
     )
     
     async def _run(self, params: Dict[str, Any]) -> str:
         """Run the resource discovery tool."""
-        session = await self._get_discovery_session(params)
         regions = params.get("regions")
-        resource_types = params.get("resource_types")
+        resource_types = params.get("resource_types", ["ec2", "s3", "rds", "lambda"])
         max_items = params.get("max_items", 100)
         
+        # Support for cross-account discovery
+        assume_role_arn = params.get("assume_role_arn")
+        external_id = params.get("external_id")
+        
         try:
-            # Run the discovery process
-            resources = await discover_all_resources(
-                session=session,
+            # Create AWS discovery instance
+            discovery = AWSResourceDiscovery(
                 regions=regions,
-                resource_types=resource_types
+                assume_role_arn=assume_role_arn,
+                external_id=external_id
             )
             
-            # Format results
-            result = {"discovered_resources": {}}
+            # Run the discovery process with real AWS integration
+            resources = await discovery.discover_all_resources(
+                resource_types=resource_types,
+                regions=regions
+            )
             
-            # Count resources by type
-            for resource_type, items in resources.items():
-                count = len(items)
-                sample = list(items.values())[:max_items] if isinstance(items, dict) else items[:max_items]
-                
-                result["discovered_resources"][resource_type] = {
-                    "count": count,
-                    "sample": sample
-                }
+            # Store discovered resources in registry
+            for resource_type, region_data in resources.items():
+                if resource_type == "discovery_summary":
+                    continue
+                    
+                if isinstance(region_data, dict):
+                    for region, data in region_data.items():
+                        if isinstance(data, dict) and "instances" in data:
+                            for resource in data["instances"]:
+                                # Store in registry for later queries
+                                ResourceRegistry.register_resource(resource)
+                        elif isinstance(data, dict) and "functions" in data:
+                            for resource in data["functions"]:
+                                ResourceRegistry.register_resource(resource)
+                        elif isinstance(data, dict) and "buckets" in data:
+                            for resource in data["buckets"]:
+                                ResourceRegistry.register_resource(resource)
+            
+            # Get resource relationships
+            relationships = discovery.get_resource_relationships(resources)
+            
+            # Format results with summary
+            result = {
+                "discovered_resources": resources,
+                "relationships": relationships,
+                "summary": resources.get("discovery_summary", {})
+            }
             
             return json.dumps(result, indent=2)
         
