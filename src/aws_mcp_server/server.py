@@ -7,6 +7,7 @@ providing a standardized interface for AWS CLI command execution and documentati
 import asyncio
 import logging
 import sys
+from typing import Dict, Any
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
@@ -40,6 +41,11 @@ from aws_mcp_server.progress import (
 )
 from aws_mcp_server.automation import IntelligentAutomation
 from aws_mcp_server.ml_ai import MLAIEngine
+from aws_mcp_server.security.security_hub import SecurityHubClient, FindingSeverity, WorkflowStatus
+from aws_mcp_server.security.guardduty import GuardDutyClient, ThreatDetector, ThreatSeverity
+from aws_mcp_server.security.iam_analyzer import IAMAnalyzer, RiskLevel
+from aws_mcp_server.security.secrets_manager import SecretsManagerClient, KMSClient, SecureCredentialManager, SecretType
+from aws_mcp_server.security.compliance import ComplianceScanner, ComplianceFramework
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", handlers=[logging.StreamHandler(sys.stderr)])
@@ -1404,3 +1410,540 @@ async def get_ml_pipeline_status(
             "status": "error",
             "message": str(e)
         }
+
+
+# Security Hub Tools
+@mcp.tool()
+async def security_hub_get_findings(
+    severity_threshold: str = Field(description="Minimum severity (LOW, MEDIUM, HIGH, CRITICAL)", default="MEDIUM"),
+    max_results: int = Field(description="Maximum findings to return", default=100),
+    workflow_status: str = Field(description="Workflow status filter (NEW, ASSIGNED, IN_PROGRESS, RESOLVED)", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Retrieve security findings from AWS Security Hub.
+    
+    Features:
+    - Filter by severity threshold
+    - Filter by workflow status
+    - Get detailed finding information
+    """
+    if ctx:
+        await ctx.info(f"Retrieving Security Hub findings (severity >= {severity_threshold})")
+    
+    try:
+        client = SecurityHubClient(region=region)
+        
+        # Convert string to enum
+        severity = FindingSeverity[severity_threshold.upper()] if severity_threshold else None
+        workflow = WorkflowStatus[workflow_status.upper()] if workflow_status else None
+        
+        findings = await client.get_findings(
+            severity_threshold=severity,
+            max_results=max_results,
+            workflow_status=workflow
+        )
+        
+        if ctx:
+            await ctx.info(f"Found {len(findings)} security findings")
+        
+        return {
+            "status": "success",
+            "finding_count": len(findings),
+            "findings": [
+                {
+                    "id": f.id,
+                    "title": f.title,
+                    "severity": f.severity.value,
+                    "status": f.workflow_status.value,
+                    "resource": f.resource_id,
+                    "created": f.created_at.isoformat() if f.created_at else None
+                }
+                for f in findings
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving Security Hub findings: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def security_hub_update_finding(
+    finding_id: str = Field(description="Security Hub finding ID"),
+    workflow_status: str = Field(description="New workflow status (ASSIGNED, IN_PROGRESS, RESOLVED)"),
+    note: str = Field(description="Optional note to add", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Update a security finding in Security Hub.
+    
+    Features:
+    - Update workflow status
+    - Add notes with context
+    - Track remediation progress
+    """
+    if ctx:
+        await ctx.info(f"Updating finding {finding_id} to status: {workflow_status}")
+    
+    try:
+        client = SecurityHubClient(region=region)
+        
+        workflow = WorkflowStatus[workflow_status.upper()]
+        
+        response = await client.update_finding(
+            finding_id=finding_id,
+            workflow_status=workflow,
+            note=note
+        )
+        
+        return {
+            "status": "success",
+            "message": f"Finding {finding_id} updated to {workflow_status}",
+            "response": response
+        }
+    except Exception as e:
+        logger.error(f"Error updating finding: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# GuardDuty Tools
+@mcp.tool()
+async def guardduty_get_threats(
+    severity_threshold: str = Field(description="Minimum severity (LOW, MEDIUM, HIGH)", default="MEDIUM"),
+    max_results: int = Field(description="Maximum threats to return", default=100),
+    archived: bool = Field(description="Include archived findings", default=False),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Retrieve threat findings from AWS GuardDuty.
+    
+    Features:
+    - Real-time threat detection
+    - Filter by severity
+    - Get detailed threat intelligence
+    """
+    if ctx:
+        await ctx.info(f"Retrieving GuardDuty threats (severity >= {severity_threshold})")
+    
+    try:
+        client = GuardDutyClient(region=region)
+        
+        severity = ThreatSeverity[severity_threshold.upper()] if severity_threshold else None
+        
+        findings = await client.get_findings(
+            severity_threshold=severity,
+            max_results=max_results,
+            archived=archived
+        )
+        
+        if ctx:
+            await ctx.info(f"Found {len(findings)} threat findings")
+        
+        return {
+            "status": "success",
+            "threat_count": len(findings),
+            "threats": [
+                {
+                    "id": f.id,
+                    "type": f.type,
+                    "severity": f.threat_severity.value,
+                    "title": f.title,
+                    "resource_type": f.resource_type,
+                    "resource_id": f.resource_id,
+                    "confidence": f.confidence,
+                    "count": f.count
+                }
+                for f in findings
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error retrieving GuardDuty findings: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def guardduty_threat_report(
+    days: int = Field(description="Number of days to analyze", default=7),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Generate comprehensive threat analysis report from GuardDuty.
+    
+    Provides:
+    - Threat statistics and trends
+    - Top threats by type
+    - Most affected resources
+    """
+    if ctx:
+        await ctx.info(f"Generating threat report for last {days} days")
+    
+    try:
+        client = GuardDutyClient(region=region)
+        detector = ThreatDetector(client)
+        
+        from datetime import timedelta
+        report = await detector.generate_threat_report(timedelta(days=days))
+        
+        if ctx:
+            await ctx.info(f"Report generated with {report['total_findings']} findings")
+        
+        return {
+            "status": "success",
+            "report": report
+        }
+    except Exception as e:
+        logger.error(f"Error generating threat report: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# IAM Analyzer Tools
+@mcp.tool()
+async def iam_analyze_policies(
+    include_aws_managed: bool = Field(description="Include AWS managed policies", default=False),
+    risk_level: str = Field(description="Minimum risk level to report (LOW, MEDIUM, HIGH, CRITICAL)", default="MEDIUM"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Analyze IAM policies for security risks and overly permissive access.
+    
+    Features:
+    - Detect wildcard permissions
+    - Find dangerous actions
+    - Identify unused permissions
+    - Generate least-privilege recommendations
+    """
+    if ctx:
+        await ctx.info("Analyzing IAM policies for security risks")
+    
+    try:
+        analyzer = IAMAnalyzer()
+        
+        results = await analyzer.analyze_all_policies(include_aws_managed=include_aws_managed)
+        
+        # Filter by risk level
+        min_risk = RiskLevel[risk_level.upper()]
+        risk_scores = {RiskLevel.LOW: 1, RiskLevel.MEDIUM: 2, RiskLevel.HIGH: 3, RiskLevel.CRITICAL: 4}
+        min_score = risk_scores[min_risk]
+        
+        filtered_results = []
+        for result in results:
+            max_finding_risk = max(
+                (risk_scores[f.risk_level] for f in result.findings),
+                default=0
+            )
+            if max_finding_risk >= min_score:
+                filtered_results.append(result)
+        
+        if ctx:
+            await ctx.info(f"Found {len(filtered_results)} policies with risks >= {risk_level}")
+        
+        return {
+            "status": "success",
+            "policy_count": len(filtered_results),
+            "policies": [
+                {
+                    "policy_name": r.policy_name,
+                    "resource_arn": r.resource_arn,
+                    "risk_score": r.risk_score,
+                    "finding_count": len(r.findings),
+                    "findings": [
+                        {
+                            "type": f.finding_type.value,
+                            "risk": f.risk_level.value,
+                            "description": f.description,
+                            "recommendation": f.recommendation
+                        }
+                        for f in r.findings
+                    ]
+                }
+                for r in filtered_results
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error analyzing policies: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def iam_generate_least_privilege(
+    policy_arn: str = Field(description="ARN of the policy to optimize"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Generate least-privilege version of an IAM policy.
+    
+    Features:
+    - Remove wildcard permissions
+    - Scope resources appropriately
+    - Add security conditions
+    - Calculate risk reduction
+    """
+    if ctx:
+        await ctx.info(f"Generating least-privilege policy for {policy_arn}")
+    
+    try:
+        analyzer = IAMAnalyzer()
+        
+        # Get current policy
+        result = await analyzer.analyze_policy(policy_arn)
+        
+        if not result.policy_document:
+            return {"status": "error", "message": "Could not retrieve policy document"}
+        
+        # Generate recommendation
+        recommendation = await analyzer.generate_least_privilege_policy(
+            result.policy_document
+        )
+        
+        if ctx:
+            await ctx.info(f"Generated policy with {recommendation.risk_reduction:.1%} risk reduction")
+        
+        return {
+            "status": "success",
+            "original_policy": recommendation.original_policy,
+            "recommended_policy": recommendation.recommended_policy,
+            "removed_permissions": recommendation.removed_permissions,
+            "risk_reduction": recommendation.risk_reduction,
+            "explanation": recommendation.explanation
+        }
+    except Exception as e:
+        logger.error(f"Error generating least-privilege policy: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# Secrets Manager Tools
+@mcp.tool()
+async def secrets_create(
+    name: str = Field(description="Secret name"),
+    secret_value: str = Field(description="Secret value (string or JSON)"),
+    description: str = Field(description="Secret description", default=None),
+    secret_type: str = Field(description="Type of secret (database, api_key, oauth_token, ssh_key, generic)", default="generic"),
+    kms_key_id: str = Field(description="KMS key ID for encryption", default=None),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Create a new secret in AWS Secrets Manager.
+    
+    Features:
+    - Secure storage with encryption
+    - Support for various secret types
+    - Automatic versioning
+    - Optional KMS encryption
+    """
+    if ctx:
+        await ctx.info(f"Creating secret: {name}")
+    
+    try:
+        client = SecretsManagerClient(region=region)
+        
+        # Try to parse as JSON
+        import json
+        try:
+            secret_dict = json.loads(secret_value)
+        except:
+            secret_dict = secret_value
+        
+        secret = await client.create_secret(
+            name=name,
+            secret_value=secret_dict,
+            description=description,
+            kms_key_id=kms_key_id,
+            secret_type=SecretType[secret_type.upper()]
+        )
+        
+        return {
+            "status": "success",
+            "secret_arn": secret.arn,
+            "version_id": secret.version_id,
+            "name": secret.name
+        }
+    except Exception as e:
+        logger.error(f"Error creating secret: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def secrets_rotate_password(
+    name: str = Field(description="Secret name containing database credentials"),
+    length: int = Field(description="Password length", default=32),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Generate and store a new random password in Secrets Manager.
+    
+    Features:
+    - Cryptographically secure passwords
+    - Configurable complexity
+    - Automatic secret update
+    """
+    if ctx:
+        await ctx.info(f"Rotating password for secret: {name}")
+    
+    try:
+        client = SecretsManagerClient(region=region)
+        
+        # Generate new password
+        new_password = await client.generate_random_password(
+            length=length,
+            exclude_characters=' "\'\\',
+            require_each_included_type=True
+        )
+        
+        # Get current secret
+        secret, current_value = await client.get_secret(name)
+        
+        # Update with new password
+        if isinstance(current_value, dict):
+            current_value['password'] = new_password
+            updated_secret = await client.update_secret(name, current_value)
+        else:
+            updated_secret = await client.update_secret(name, new_password)
+        
+        return {
+            "status": "success",
+            "secret_name": updated_secret.name,
+            "version_id": updated_secret.version_id,
+            "message": "Password rotated successfully"
+        }
+    except Exception as e:
+        logger.error(f"Error rotating password: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# Compliance Tools
+@mcp.tool()
+async def compliance_scan(
+    framework: str = Field(description="Compliance framework (PCI_DSS, HIPAA, SOC2, CIS)"),
+    auto_remediate: bool = Field(description="Automatically fix issues where possible", default=False),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Run compliance scan against security frameworks.
+    
+    Supported frameworks:
+    - PCI DSS: Payment card security
+    - HIPAA: Healthcare data protection
+    - SOC2: Service organization controls
+    - CIS: Security benchmarks
+    
+    Features:
+    - Automated compliance checking
+    - Detailed findings and evidence
+    - Optional auto-remediation
+    - Compliance scoring
+    """
+    if ctx:
+        await ctx.info(f"Running {framework} compliance scan")
+    
+    try:
+        scanner = ComplianceScanner(region=region)
+        
+        framework_enum = ComplianceFramework[framework.upper()]
+        
+        report = await scanner.scan_compliance(
+            framework=framework_enum,
+            auto_remediate=auto_remediate
+        )
+        
+        if ctx:
+            await ctx.info(f"Compliance score: {report.compliance_score:.1f}%")
+        
+        # Summarize results
+        critical_findings = [
+            r for r in report.results 
+            if r.status.value == "NON_COMPLIANT" and r.control.severity.value == "CRITICAL"
+        ]
+        
+        high_findings = [
+            r for r in report.results
+            if r.status.value == "NON_COMPLIANT" and r.control.severity.value == "HIGH"
+        ]
+        
+        return {
+            "status": "success",
+            "framework": report.framework.value,
+            "compliance_score": report.compliance_score,
+            "scan_date": report.scan_date.isoformat(),
+            "summary": {
+                "total_controls": report.total_controls,
+                "compliant": report.compliant_controls,
+                "non_compliant": report.non_compliant_controls,
+                "not_applicable": report.not_applicable_controls,
+                "errors": report.error_controls
+            },
+            "critical_findings": len(critical_findings),
+            "high_findings": len(high_findings),
+            "recommendations": report.recommendations,
+            "details": [
+                {
+                    "control_id": r.control.control_id,
+                    "title": r.control.title,
+                    "status": r.status.value,
+                    "severity": r.control.severity.value,
+                    "details": r.details,
+                    "remediation_available": r.remediation_available
+                }
+                for r in report.results
+                if r.status.value != "COMPLIANT"
+            ][:20]  # Limit to top 20 findings
+        }
+    except Exception as e:
+        logger.error(f"Error running compliance scan: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool()
+async def compliance_export_report(
+    framework: str = Field(description="Compliance framework (PCI_DSS, HIPAA, SOC2, CIS)"),
+    format: str = Field(description="Export format (json, csv, html)", default="json"),
+    output_file: str = Field(description="Output file path"),
+    region: str = Field(description="AWS region", default="us-east-1"),
+    ctx: Context | None = None,
+) -> Dict[str, Any]:
+    """
+    Export detailed compliance report in various formats.
+    
+    Features:
+    - Multiple export formats
+    - Detailed findings with evidence
+    - Executive summary
+    - Remediation guidance
+    """
+    if ctx:
+        await ctx.info(f"Exporting {framework} compliance report as {format}")
+    
+    try:
+        scanner = ComplianceScanner(region=region)
+        
+        framework_enum = ComplianceFramework[framework.upper()]
+        
+        # Run scan
+        report = await scanner.scan_compliance(framework=framework_enum)
+        
+        # Export report
+        exported_content = await scanner.export_report(report, format=format)
+        
+        # Write to file
+        with open(output_file, 'w') as f:
+            f.write(exported_content)
+        
+        if ctx:
+            await ctx.info(f"Report exported to {output_file}")
+        
+        return {
+            "status": "success",
+            "message": f"Compliance report exported to {output_file}",
+            "format": format,
+            "file_path": output_file,
+            "compliance_score": report.compliance_score
+        }
+    except Exception as e:
+        logger.error(f"Error exporting compliance report: {e}")
+        return {"status": "error", "message": str(e)}
